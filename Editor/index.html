@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SurrealEd</title>
+<link rel="stylesheet" href="RiotEditor.css">
+</head>
+<body>
+<div id="App">
+  <header id="TitleBar">
+    <div class="Brand"><span class="BrandName">SurrealEd</span> <span class="BrandVersion" id="VersionLabel"></span></div>
+    <div class="GameLabel" id="GameLabel"></div>
+  </header>
+
+  <nav id="MenuBar" aria-label="Menu">
+    <div class="Menu">
+      <button class="MenuButton" data-menu="FileMenu" data-i18n="MenuFile">Arquivo</button>
+      <div class="MenuList" id="FileMenu" hidden>
+        <button data-action="ChooseLevel" data-i18n="ActionChooseLevel">Escolher fase…</button>
+        <button data-action="ReloadLevel" data-i18n="ActionReloadLevel">Recarregar fase</button>
+        <hr>
+        <button data-action="SaveLevel" data-i18n="ActionSave">Salvar .lvl</button>
+        <button data-action="RestoreLevel" data-i18n="ActionRestore">Restaurar o .lvl original…</button>
+      </div>
+    </div>
+    <div class="Menu">
+      <button class="MenuButton" data-menu="EditMenu" data-i18n="MenuEdit">Editar</button>
+      <div class="MenuList" id="EditMenu" hidden>
+        <button data-action="Undo" data-i18n="ActionUndo">Undo</button>
+        <button data-action="Redo" data-i18n="ActionRedo">Redo</button>
+        <hr>
+        <button data-action="Copy" data-i18n="ActionCopy">Copy (Ctrl+C)</button>
+        <button data-action="Paste" data-i18n="ActionPaste">Paste (Ctrl+V)</button>
+        <button data-action="Duplicate" data-i18n="ActionDuplicate">Duplicate (Ctrl+D)</button>
+        <button data-action="Delete" data-i18n="ActionDelete">Delete (Del)</button>
+        <hr>
+        <button data-action="RevertSelection" data-i18n="ActionRevertSelection">Revert selected object</button>
+        <button data-action="RevertAll" data-i18n="ActionRevertAll">Revert all changes</button>
+      </div>
+    </div>
+    <div class="Menu">
+      <button class="MenuButton" data-menu="ObjectMenu" data-i18n="MenuObject">Objeto</button>
+      <div class="MenuList" id="ObjectMenu" hidden>
+        <button data-action="FocusSelection" data-i18n="ActionFocusSelection">Enquadrar seleção</button>
+        <button data-action="ClearSelection" data-i18n="ActionClearSelection">Limpar seleção</button>
+      </div>
+    </div>
+    <div class="Menu">
+      <button class="MenuButton" data-menu="ViewMenu" data-i18n="MenuView">Exibir</button>
+      <div class="MenuList" id="ViewMenu" hidden>
+        <button data-action="CameraOverview" data-i18n="CameraOverview">Visão geral</button>
+        <button data-action="CameraStart" data-i18n="CameraStart">Início da fase</button>
+        <hr>
+        <button data-action="LanguagePT">Português</button>
+        <button data-action="LanguageEN">English</button>
+      </div>
+    </div>
+    <div class="Menu">
+      <button class="MenuButton" data-action="About" data-i18n="MenuAbout">Sobre</button>
+    </div>
+  </nav>
+
+  <nav id="Tabs" role="tablist" aria-label="Módulos">
+    <button role="tab" class="Tab" data-tab="Level" aria-selected="true" data-i18n="TabLevel">Fase</button>
+    <button role="tab" class="Tab" data-tab="Textures" aria-selected="false" data-i18n="TabTextures">Texturas</button>
+    <button role="tab" class="Tab" data-tab="Models" aria-selected="false" data-i18n="TabModels">Modelos</button>
+    <button role="tab" class="Tab" data-tab="Animation" aria-selected="false" data-i18n="TabAnimation">Animação</button>
+    <button role="tab" class="Tab" data-tab="Audio" aria-selected="false" data-i18n="TabAudio">Áudio</button>
+    <button role="tab" class="Tab" data-tab="STOMP" aria-selected="false">STOMP</button>
+    <button role="tab" class="Tab" data-tab="Video" aria-selected="false" data-i18n="TabVideo">Vídeo</button>
+  </nav>
+
+  <main id="Workspace">
+    <section id="ViewportArea" aria-label="Visor 3D">
+      <div id="Viewport"></div>
+
+      <div id="InfoOverlay" class="Overlay">
+        <div class="InfoFile" id="InfoFile"></div>
+        <div class="InfoName" id="InfoName">—</div>
+        <dl class="InfoStats" id="InfoStats"></dl>
+      </div>
+
+      <div id="GizmoToolbar" class="Overlay" role="toolbar" aria-label="Gizmo">
+        <button class="ToolButton" data-gizmo="select" title="Q"><span data-i18n="GizmoSelect">Select</span> <kbd>Q</kbd></button>
+        <button class="ToolButton" data-gizmo="translate" title="W"><span data-i18n="GizmoMove">Move</span> <kbd>W</kbd></button>
+        <button class="ToolButton" data-gizmo="rotate" title="E"><span data-i18n="GizmoRotate">Rotate</span> <kbd>E</kbd></button>
+        <button class="ToolButton" data-gizmo="scale" title="R"><span data-i18n="GizmoScale">Scale</span> <kbd>R</kbd></button>
+        <span class="ToolSep"></span>
+        <button class="ToolButton" id="GizmoSpace" title="`"></button>
+        <label class="ToolSnap" title="Grid"><span>⌗</span><select id="SnapMove"><option value="0">—</option><option value="0.1">0.1</option><option value="0.5">0.5</option><option value="1">1</option><option value="5">5</option></select></label>
+        <label class="ToolSnap" title="Rotation"><span>∠</span><select id="SnapRotate"><option value="1">1°</option><option value="5">5°</option><option value="15">15°</option><option value="45">45°</option><option value="90">90°</option></select></label>
+        <label class="ToolSnap" title="Scale"><span>⤢</span><select id="SnapScale"><option value="0">—</option><option value="0.1">0.1</option><option value="0.25">0.25</option></select></label>
+      </div>
+
+      <div id="RenderOverlay" class="Overlay">
+        <div class="RenderTitle" data-i18n="ViewportRendering">Renderização</div>
+        <label class="Radio"><input type="radio" name="RenderMode" value="Textured" checked> <span data-i18n="RenderTextured">Com textura</span></label>
+        <label class="Radio"><input type="radio" name="RenderMode" value="NoTexture"> <span data-i18n="RenderNoTexture">Sem textura</span></label>
+        <label class="Check"><input type="checkbox" id="RenderWireframe"> <span data-i18n="RenderWireframe">Wireframe</span></label>
+        <label class="Check"><input type="checkbox" id="RenderNormals"> <span data-i18n="RenderNormals">Normais</span></label>
+        <label class="Check"><input type="checkbox" id="RenderSky" checked> <span data-i18n="RenderSky">Céu (skybox)</span></label>
+        <label class="Check"><input type="checkbox" id="RenderParticles" checked> <span data-i18n="RenderParticles">Efeitos de partículas</span></label>
+        <label class="Check"><input type="checkbox" id="RenderParticlesOff"> <span data-i18n="RenderParticlesOff">Prévia dos efeitos ligados por mensagem</span></label>
+        <label class="Check"><input type="checkbox" id="RenderAnimate" checked> <span data-i18n="RenderAnimate">Animar materiais</span></label>
+        <label class="Check"><input type="checkbox" id="RenderLightIcons" checked> <span data-i18n="RenderLightIcons">Ícones (luzes e efeitos)</span></label>
+        <label class="Check RenderRange"><span data-i18n="IconSize">Tamanho dos ícones</span> <input type="range" id="IconSize" min="0.02" max="0.16" step="0.005" value="0.06"></label>
+        <label class="Check"><input type="checkbox" id="RenderDormant"> <span data-i18n="RenderDormant">Objetos fora do jogo no início</span></label>
+        <div class="RenderTitle Sub" data-i18n="RenderDynamic">Iluminação dinâmica</div>
+        <label class="Check"><input type="checkbox" id="LightWorld" checked> <span data-i18n="LightWorld">Ambiente/direcional (sem .ldu)</span></label>
+        <label class="Check"><input type="checkbox" id="LightPoint" checked> <span data-i18n="LightPoint">Point Lights (aproximação)</span></label>
+        <label class="Check"><input type="checkbox" id="ShadowOn"> <span data-i18n="ShadowOn">Dynamic shadows (as in game)</span></label>
+        <label class="Check"><input type="checkbox" id="RenderFog"> <span data-i18n="RenderFog">Neblina do jogo</span></label>
+        <label class="Check"><input type="checkbox" id="ShadowDebug"> <span data-i18n="ShadowDebug">Debug shadows (projection area)</span></label>
+        <div class="RenderTitle Sub" data-i18n="Performance">Desempenho</div>
+        <label class="Check RenderRange"><span data-i18n="Resolution">Resolução</span>
+          <select id="Resolution"><option value="1">100%</option><option value="0.75">75%</option><option value="0.5">50%</option></select></label>
+        <div id="PerfGpu" class="PerfLine"></div>
+        <div id="PerfStats" class="PerfLine"></div>
+      </div>
+
+      <div id="KeysOverlay" class="Overlay Keys"><div data-i18n-html="KeysHelp"></div><div id="SpeedLabel"></div></div>
+
+      <pre id="SelectionOverlay" class="Overlay" hidden aria-live="polite"></pre>
+
+      <div id="StompBar" class="Overlay" hidden role="toolbar" aria-label="STOMP">
+        <div class="StompBarRow">
+          <b id="StompBarTitle">STOMP</b>
+          <button class="ToolButton" id="StompBarPlay" data-i18n="AnimPlay">Play</button>
+          <div class="TimeTrack"><input type="range" id="StompBarTime" min="0" max="1" step="0.001" value="0" aria-label="Time"></div>
+          <span class="TimeLabel" id="StompBarLabel">0.00 s</span>
+          <button class="ToolButton" id="StompBarClose" data-i18n="StompExit">Exit</button>
+        </div>
+        <div class="StompBarRow">
+          <label class="Check"><input type="checkbox" id="StompBarCamera" checked> <span data-i18n="StompSceneCamera">Scene camera</span></label>
+          <label class="Check"><input type="checkbox" id="StompBarSound" checked> <span data-i18n="StompSound">Sound</span></label>
+          <span class="Muted" id="StompBarNote"></span>
+        </div>
+        <pre id="StompBarLog"></pre>
+      </div>
+      <div id="StompSubtitle" hidden></div>
+
+      <div id="Loading" hidden><p id="LoadingText"></p></div>
+
+      <div id="Placeholder" hidden>
+        <div class="PlaceholderBox">
+          <h2 id="PlaceholderTitle"></h2>
+          <p data-i18n="PlaceholderText">Esta aba ainda não foi montada. Por enquanto só a aba Fase funciona.</p>
+        </div>
+      </div>
+    </section>
+
+    <aside id="SidePanel" aria-label="Painel">
+      <div class="PanelBlock">
+        <label class="BlockLabel" for="LevelSelect" data-i18n="FileSelectLevel">Arquivo (.lvl)</label>
+        <select id="LevelSelect"></select>
+      </div>
+
+      <section class="Outliner" aria-labelledby="OutlinerTitle">
+        <div class="OutlinerHead"><span class="BlockLabel" id="OutlinerTitle" data-i18n="SectionObjects">Objetos por classe</span></div>
+        <div class="ClassTools">
+          <input type="search" id="ClassFilter" data-i18n-placeholder="FilterPlaceholder" placeholder="Filtrar classes…" aria-label="Filtrar classes">
+          <button class="Small" id="ClassAll" data-i18n="ShowAll">Todas</button>
+          <button class="Small" id="ClassNone" data-i18n="ShowNone">Nenhuma</button>
+        </div>
+        <div id="ClassList" class="ClassList"></div>
+      </section>
+
+      <div class="PanelTabs" role="tablist" aria-label="Painel">
+        <button role="tab" id="TabDetails" aria-controls="DetailsPane" aria-selected="true" data-i18n="PaneDetails">Details</button>
+        <button role="tab" id="TabWorld" aria-controls="WorldPane" aria-selected="false" data-i18n="PaneWorld">World Settings</button>
+      </div>
+
+      <div class="PanelScroll" id="DetailsPane" role="tabpanel" aria-labelledby="TabDetails">
+        <p class="PaneNote" data-i18n="PaneDetailsNote">O que está no .lvl: o objeto selecionado e as propriedades dele.</p>
+        <details class="Section" open>
+          <summary data-i18n="SectionSelection">Objeto selecionado</summary>
+          <pre id="SelectionInfo" class="SelectionInfo Empty" data-i18n="SelectionEmpty">Clique num objeto no visor.</pre>
+        </details>
+
+        <details class="Section" open id="PropertiesSection">
+          <summary data-i18n="SectionProperties">Properties</summary>
+          <div id="PropertiesPanel" class="PropertiesPanel"><p class="Note" data-i18n="PropEmpty">Select an object to see its flags and properties.</p></div>
+        </details>
+      </div>
+
+      <div class="PanelScroll" id="WorldPane" role="tabpanel" aria-labelledby="TabWorld" hidden>
+        <p class="PaneNote" data-i18n="PaneWorldNote">O que vale para a fase inteira e o que ela puxa de fora (World Common, System, FX).</p>
+        <details class="Section" open id="EnvironmentSection">
+          <summary data-i18n="SectionEnvironment">Level environment</summary>
+          <div id="EnvironmentPanel" class="EnvPanel"><p class="Note" data-i18n="EnvLoading">Reading the level environment…</p></div>
+        </details>
+
+        <details class="Section">
+          <summary data-i18n="SectionLighting">Iluminação</summary>
+          <label class="Check"><input type="checkbox" id="LightBaked" checked> <span data-i18n="LightBaked">Luz pré-calculada (.ldu)</span></label>
+          <label class="Range"><span data-i18n="LightGain">Brilho</span> <input type="range" id="LightGain" min="0.5" max="4" step="0.05" value="1"><output id="LightGainValue"></output></label>
+          <label class="Check"><input type="checkbox" id="SplatFade" checked> <span data-i18n="SplatFade">Terrain detail fades with distance</span></label>
+          <label class="Range"><span data-i18n="LightAmbient">Ambiente</span> <input type="range" id="LightAmbient" min="0" max="0.6" step="0.01" value="0.06"><output id="LightAmbientValue"></output></label>
+          <div class="ShadowBlock">
+            <label class="Check"><input type="checkbox" id="ShadowMarkers"> <span data-i18n="ShadowMarkers">Mark shadow casters</span></label>
+            <div class="ShadowFade"><span data-i18n="ShadowFade">Fade (m)</span>
+              <input type="number" id="ShadowFadeStart" min="0" max="500" step="1" value="15" aria-label="Fade start">
+              <span>→</span>
+              <input type="number" id="ShadowFadeEnd" min="1" max="500" step="1" value="30" aria-label="Fade end"></div>
+            <p class="Note" id="ShadowStatus"></p>
+          </div>
+        </details>
+
+        <details class="Section">
+          <summary data-i18n="SectionCells">Salas e portais</summary>
+          <label class="Check"><input type="checkbox" id="CellShow"> <span data-i18n="CellShow">Mostrar salas, células e portais</span></label>
+          <select id="CellSelect" disabled></select>
+          <button class="Small" id="CellGo" disabled data-i18n="CellGo">Ir até a sala</button>
+          <p class="Note" id="CellNote" data-i18n="CellNote">Laranja: sala escolhida · azul: o que ela enxerga (PVS) · verde: portais.</p>
+        </details>
+      </div>
+
+      <div class="PanelButtons">
+        <button class="Button" disabled data-i18n="Export" title="Em breve">Exportar</button>
+        <button class="Button" disabled data-i18n="Import" title="Em breve">Importar</button>
+      </div>
+    </aside>
+    <section id="TexturesPane" class="AssetPane" hidden aria-label="Textures">
+      <aside class="AssetList">
+        <label class="BlockLabel" for="TexPackage" data-i18n="AssetPackage">Package</label>
+        <select id="TexPackage" class="PackageSelect"></select>
+        <input type="search" id="TexFilter" data-i18n-placeholder="TexFilterPlaceholder" placeholder="Filter: ref, size, format…" aria-label="Filter textures">
+        <div class="AssetCount" id="TexCount"></div>
+        <div id="TexGrid" class="TexGrid" role="listbox" aria-label="Textures"></div>
+      </aside>
+      <section class="AssetStage TexStage" id="TexStage">
+        <canvas id="TexCanvas"></canvas>
+        <div class="Overlay StageTools" role="toolbar">
+          <div class="ToolGroup">
+            <button class="ToolButton" data-texzoom="fit" data-i18n="TexFit">Fit</button>
+            <button class="ToolButton" data-texzoom="1">1:1</button>
+            <button class="ToolButton" data-texzoom="2">2×</button>
+            <button class="ToolButton" data-texzoom="4">4×</button>
+          </div>
+          <div class="ToolGroup">
+            <button class="ToolButton" data-texchannel="rgba">RGBA</button>
+            <button class="ToolButton" data-texchannel="rgb">RGB</button>
+            <button class="ToolButton" data-texchannel="alpha">Alpha</button>
+          </div>
+          <label class="Check"><input type="checkbox" id="TexTile"> <span data-i18n="TexTile">Tile 3×3</span></label>
+        </div>
+        <p class="StageEmpty" id="TexEmpty" data-i18n="TexEmpty">Pick a texture on the left.</p>
+      </section>
+      <aside class="AssetInfo" id="TexInfo"></aside>
+    </section>
+
+    <section id="ModelsPane" class="AssetPane" hidden aria-label="Models">
+      <aside class="AssetList">
+        <label class="BlockLabel" for="ModelPackage" data-i18n="AssetPackage">Package</label>
+        <select id="ModelPackage" class="PackageSelect"></select>
+        <input type="search" id="ModelFilter" data-i18n-placeholder="ModelFilterPlaceholder" placeholder="Filter: ref or class…" aria-label="Filter models">
+        <label class="Check"><input type="checkbox" id="ModelSkinnedOnly"> <span data-i18n="ModelSkinnedOnly">Only skinned (with skeleton)</span></label>
+        <div class="AssetCount" id="ModelCount"></div>
+        <div id="ModelList" class="AssetRows" role="listbox" aria-label="Models"></div>
+      </aside>
+      <section class="AssetStage" id="ModelStage">
+        <div class="StageViewport" id="ModelViewport"></div>
+        <div class="Overlay StageTools" role="toolbar">
+          <label class="Radio"><input type="radio" name="ModelRender" value="Textured" checked> <span data-i18n="RenderTextured">Textured</span></label>
+          <label class="Radio"><input type="radio" name="ModelRender" value="NoTexture"> <span data-i18n="RenderNoTexture">No texture</span></label>
+          <label class="Check"><input type="checkbox" id="ModelWire"> <span data-i18n="RenderWireframe">Wireframe</span></label>
+          <label class="Check"><input type="checkbox" id="ModelBones"> <span data-i18n="ShowSkeleton">Skeleton</span></label>
+          <label class="Check"><input type="checkbox" id="ModelGrid" checked> <span data-i18n="ShowGrid">Grid</span></label>
+        </div>
+        <div class="Overlay Keys StageKeys" data-i18n-html="AssetKeys"></div>
+        <p class="StageEmpty" id="ModelEmpty" data-i18n="ModelEmpty">Pick a model on the left.</p>
+      </section>
+      <aside class="AssetInfo" id="ModelInfo"></aside>
+    </section>
+
+    <section id="AnimationPane" class="AssetPane" hidden aria-label="Animation">
+      <aside class="AssetList">
+        <label class="BlockLabel" for="AnimPackage" data-i18n="AssetPackage">Package</label>
+        <select id="AnimPackage" class="PackageSelect"></select>
+        <input type="search" id="AnimFilter" data-i18n-placeholder="AnimFilterPlaceholder" placeholder="Filter: ref or model…" aria-label="Filter animations">
+        <div class="AssetCount" id="AnimCount"></div>
+        <div id="AnimList" class="AssetRows" role="listbox" aria-label="Animations"></div>
+      </aside>
+      <section class="AssetStage" id="AnimStage">
+        <div class="StageViewport" id="AnimViewport"></div>
+        <div class="Overlay StageTools" role="toolbar">
+          <label class="BlockLabel" for="AnimModel" data-i18n="AnimModel">Model</label>
+          <select id="AnimModel"></select>
+          <label class="Check"><input type="checkbox" id="AnimBones"> <span data-i18n="ShowSkeleton">Skeleton</span></label>
+          <label class="Check"><input type="checkbox" id="AnimInPlace" checked> <span data-i18n="AnimInPlace">In place</span></label>
+        </div>
+        <div class="Timeline" id="AnimTimeline">
+          <button class="ToolButton" id="AnimPlay" data-i18n="AnimPlay">Play</button>
+          <div class="TimeTrack"><input type="range" id="AnimTime" min="0" max="1" step="0.001" value="0" aria-label="Time"><div class="EventMarks" id="AnimMarks"></div></div>
+          <span class="TimeLabel" id="AnimTimeLabel">0.00 s</span>
+          <select id="AnimSpeed" aria-label="Speed"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
+          <label class="Check"><input type="checkbox" id="AnimLoop" checked> <span data-i18n="AnimLoop">Loop</span></label>
+        </div>
+        <p class="StageEmpty" id="AnimEmpty" data-i18n="AnimEmpty">Pick an animation on the left.</p>
+      </section>
+      <aside class="AssetInfo" id="AnimInfo"></aside>
+    </section>
+    <section id="AudioPane" class="AssetPane" hidden aria-label="Audio">
+      <aside class="AssetList">
+        <label class="BlockLabel" for="AudioPackage" data-i18n="AssetPackage">Package</label>
+        <select id="AudioPackage" class="PackageSelect"></select>
+        <input type="search" id="AudioFilter" data-i18n-placeholder="AudioFilterPlaceholder" placeholder="Filter: ref or spoken text…" aria-label="Filter sounds">
+        <label class="Check"><input type="checkbox" id="AudioSpokenOnly"> <span data-i18n="AudioSpokenOnly">Only lines with text</span></label>
+        <div class="AssetCount" id="AudioCount"></div>
+        <div id="AudioList" class="AssetRows" role="listbox" aria-label="Sounds"></div>
+      </aside>
+      <section class="AssetStage MediaStage" id="AudioStage">
+        <canvas id="AudioWave" class="WaveCanvas"></canvas>
+        <div class="Timeline">
+          <button class="ToolButton" id="AudioPlay" data-i18n="AnimPlay">Play</button>
+          <button class="ToolButton" id="AudioStop" data-i18n="AudioStop">Stop</button>
+          <span class="TimeLabel" id="AudioTime">0.00 s</span>
+          <label class="Check"><input type="checkbox" id="AudioLoop"> <span data-i18n="AnimLoop">Loop</span></label>
+          <label class="Check"><input type="checkbox" id="AudioLips" checked> <span data-i18n="AudioLips">Lip-sync curve</span></label>
+          <label class="Range"><span data-i18n="AudioVolume">Volume</span> <input type="range" id="AudioVolume" min="0" max="1" step="0.05" value="0.8"></label>
+        </div>
+        <p class="StageEmpty" id="AudioEmpty" data-i18n="AudioEmpty">Pick a sound on the left.</p>
+      </section>
+      <aside class="AssetInfo" id="AudioInfo"></aside>
+    </section>
+
+    <section id="STOMPPane" class="AssetPane" hidden aria-label="STOMP">
+      <aside class="AssetList">
+        <label class="BlockLabel" for="StompPackage" data-i18n="AssetPackage">Package</label>
+        <select id="StompPackage" class="PackageSelect"></select>
+        <input type="search" id="StompFilter" data-i18n-placeholder="StompFilterPlaceholder" placeholder="Filter: ref or track name…" aria-label="Filter sequences">
+        <div class="AssetCount" id="StompCount"></div>
+        <div id="StompList" class="AssetRows" role="listbox" aria-label="Sequences"></div>
+      </aside>
+      <section class="AssetStage MediaStage StompStage" id="StompStage">
+        <div class="DopeSheet" id="StompSheet"></div>
+        <canvas id="StompMap" class="StompMap"></canvas>
+        <div class="Timeline">
+          <button class="ToolButton" id="StompPlay" data-i18n="AnimPlay">Play</button>
+          <div class="TimeTrack"><input type="range" id="StompTime" min="0" max="1" step="0.001" value="0" aria-label="Time"></div>
+          <span class="TimeLabel" id="StompTimeLabel">0.00 s</span>
+          <label class="Check"><input type="checkbox" id="StompSound" checked> <span data-i18n="StompSound">Sound</span></label>
+        </div>
+        <p class="StageEmpty" id="StompEmpty" data-i18n="StompEmpty">Pick a sequence on the left.</p>
+      </section>
+      <aside class="AssetInfo" id="StompInfo"></aside>
+    </section>
+
+    <section id="VideoPane" class="AssetPane" hidden aria-label="Video">
+      <aside class="AssetList">
+        <label class="BlockLabel" for="VideoPackage" data-i18n="AssetPackage">Package</label>
+        <select id="VideoPackage" class="PackageSelect"></select>
+        <div class="AssetCount" id="VideoCount"></div>
+        <div id="VideoList" class="AssetRows" role="listbox" aria-label="Videos"></div>
+      </aside>
+      <section class="AssetStage MediaStage" id="VideoStage">
+        <video id="VideoPlayer" controls playsinline hidden></video>
+        <p class="StageEmpty" id="VideoEmpty" data-i18n="VideoEmpty">Pick a video on the left.</p>
+      </section>
+      <aside class="AssetInfo" id="VideoInfo"></aside>
+    </section>
+  </main>
+
+  <footer id="StatusBar"><span id="StatusText"></span><span id="StatusRight"></span></footer>
+</div>
+
+<dialog id="AboutDialog">
+  <h2>SurrealEd <span id="AboutVersion"></span></h2>
+  <p data-i18n="AboutText">Editor de arquivos do Riot Engine para The Suffering (2004) e The Suffering: Ties That Bind (2005). Lê os arquivos direto da pasta do jogo.</p>
+  <p data-i18n="AboutLicense">Licença MIT. Projeto de fã, sem ligação com a Surreal Software, a Midway ou a Warner Bros.</p>
+  <form method="dialog"><button class="Button">OK</button></form>
+</dialog>
+
+<script src="lib/three.min.js"></script>
+<script src="RiotStrings.js"></script>
+<script src="RiotTextureDecoder.js"></script>
+<script src="RiotTextureEncoder.js"></script>
+<script src="RiotCameraControls.js"></script>
+<script src="RiotViewport.js"></script>
+<script src="lib/TransformControls.js"></script>
+<script src="RiotShadows.js"></script>
+<script src="RiotStompPlayer.js"></script>
+<script src="RiotParticles.js"></script>
+<script src="RiotLevelView.js"></script>
+<script src="RiotGizmo.js"></script>
+<script src="RiotAssetTabs.js"></script>
+<script src="RiotMediaTabs.js"></script>
+<script src="RiotColorPicker.js"></script>
+<script src="RiotEditor.js"></script>
+</body>
+</html>

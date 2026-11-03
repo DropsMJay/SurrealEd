@@ -1,0 +1,356 @@
+/* SurrealEd — layout do rascunho no Figma: barra de título, menu, abas, visor à esquerda, painel à direita, barra de status.
+   Ferramenta de trabalho: tema escuro neutro, um único acento (âmbar das lâmpadas de sódio do jogo). */
+:root {
+  --Background: #16171a;
+  --Surface: #1e2024;
+  --SurfaceRaised: #26292e;
+  --Field: #121316;
+  --Line: #33363c;
+  --Text: #e4e2dc;
+  --Muted: #969890;
+  --Accent: #e0a33c;
+  --AccentText: #1b1305;
+  --Danger: #e07a5f;
+  --FontUI: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --FontMono: ui-monospace, "Cascadia Mono", Consolas, "SFMono-Regular", monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--Background); color: var(--Text); font: 13px/1.4 var(--FontUI); overflow: hidden; }
+button, input, select { font: inherit; color: inherit; }
+button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--Accent); outline-offset: 1px; }
+
+#App { display: grid; grid-template-rows: auto auto auto 1fr auto; height: 100vh; }
+
+/* barra de título e menu */
+#TitleBar { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 8px 14px 2px; }
+.BrandName { font-weight: 700; font-size: 15px; letter-spacing: .01em; }
+.BrandVersion { font: 12px var(--FontMono); color: var(--Muted); }
+.GameLabel { font: 12px var(--FontMono); color: var(--Accent); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#MenuBar { display: flex; gap: 2px; padding: 0 8px 4px; }
+.Menu { position: relative; }
+.MenuButton { background: none; border: 0; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: var(--Text); }
+.MenuButton:hover, .MenuButton[aria-expanded="true"] { background: var(--SurfaceRaised); }
+.MenuList { position: absolute; top: 100%; left: 0; z-index: 20; min-width: 210px; background: var(--SurfaceRaised); border: 1px solid var(--Line);
+  border-radius: 6px; padding: 4px; display: flex; flex-direction: column; box-shadow: 0 8px 24px #0008; }
+.MenuList[hidden] { display: none; }
+.MenuList button { text-align: left; background: none; border: 0; padding: 6px 10px; border-radius: 4px; cursor: pointer; }
+.MenuList button:hover:not(:disabled) { background: var(--Accent); color: var(--AccentText); }
+.MenuList button:disabled { color: var(--Muted); cursor: default; }
+.MenuList hr { border: 0; border-top: 1px solid var(--Line); margin: 4px 2px; width: auto; }
+
+/* abas */
+#Tabs { display: flex; gap: 3px; padding: 0 14px; overflow-x: auto; scrollbar-width: none; }
+.Tab { flex: none; min-width: 84px; padding: 5px 12px; background: var(--Surface); border: 1px solid var(--Line); border-bottom: 0;
+  border-radius: 5px 5px 0 0; color: var(--Muted); cursor: pointer; }
+.Tab:hover { color: var(--Text); }
+.Tab[aria-selected="true"] { background: var(--SurfaceRaised); color: var(--Text); box-shadow: inset 0 2px 0 var(--Accent); }
+
+/* área de trabalho */
+#Workspace { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 8px; padding: 0 14px 8px; min-height: 0; }
+#ViewportArea { position: relative; background: #0d0f0c; border: 1px solid var(--Line); border-radius: 0 6px 6px 6px; overflow: hidden; min-height: 0; }
+#Viewport { position: absolute; inset: 0; }
+#Viewport canvas { display: block; width: 100%; height: 100%; outline: none; }
+
+.Overlay { position: absolute; background: #16171ae6; border: 1px solid var(--Line); border-radius: 6px; padding: 8px 10px; }
+#InfoOverlay { top: 54px; left: 10px; max-width: min(320px, calc(100% - 20px)); pointer-events: none; }
+.InfoFile { font: 11px var(--FontMono); color: var(--Accent); text-transform: uppercase; letter-spacing: .06em; }
+.InfoName { font-weight: 700; font-size: 18px; line-height: 1.15; margin: 2px 0 4px; overflow-wrap: anywhere; }
+.InfoStats { display: grid; grid-template-columns: auto auto; gap: 1px 10px; margin: 0; font: 11px var(--FontMono); color: var(--Muted); }
+.InfoStats dd { margin: 0; color: var(--Text); text-align: right; font-variant-numeric: tabular-nums; }
+#RenderOverlay { left: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 2px; }
+.RenderTitle { font: 11px var(--FontMono); color: var(--Muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 2px; }
+.Keys { right: 10px; bottom: 10px; font: 11px/1.6 var(--FontMono); color: var(--Muted); pointer-events: none; text-align: right; }
+.Keys kbd { font: inherit; color: var(--Text); border: 1px solid var(--Line); border-radius: 3px; padding: 0 4px; }
+#SelectionOverlay { right: 10px; top: 54px; max-width: min(360px, calc(100% - 20px)); margin: 0; font: 11px/1.5 var(--FontMono); white-space: pre-wrap;
+  word-break: break-word; border-color: var(--Accent); }
+#SelectionOverlay[hidden] { display: none; }
+#Loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+#Loading[hidden] { display: none; }
+#Loading p { background: var(--SurfaceRaised); border: 1px solid var(--Line); border-radius: 6px; padding: 10px 14px; font: 12px var(--FontMono); }
+#Loading p.Error { color: var(--Danger); }
+#Placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--Background); }
+#Placeholder[hidden] { display: none; }
+.PlaceholderBox { max-width: 360px; text-align: center; color: var(--Muted); padding: 16px; }
+.PlaceholderBox h2 { color: var(--Text); margin: 0 0 8px; font-size: 18px; }
+
+/* painel lateral */
+#SidePanel { display: flex; flex-direction: column; gap: 8px; min-height: 0; background: var(--Surface); border: 1px solid var(--Line); border-radius: 6px; padding: 10px; }
+.PanelBlock { display: flex; flex-direction: column; gap: 4px; }
+.BlockLabel { font: 11px var(--FontMono); color: var(--Muted); text-transform: uppercase; letter-spacing: .06em; }
+select, input[type=search] { width: 100%; background: var(--Field); border: 1px solid var(--Line); border-radius: 4px; padding: 6px 8px; }
+.PanelScroll { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 2px; }
+.Section { background: var(--Field); border: 1px solid var(--Line); border-radius: 5px; padding: 0 8px; }
+.Section summary { cursor: pointer; padding: 7px 0; font-weight: 600; font-size: 12px; list-style-position: inside; }
+.Section[open] { padding-bottom: 8px; }
+.Section > * + * { margin-top: 6px; }
+.ClassTools { display: grid; grid-template-columns: 1fr auto auto; gap: 4px; }
+.ClassList { display: flex; flex-direction: column; overflow: auto; min-height: 0; flex: 1; }
+.ClassList label { display: flex; align-items: center; gap: 6px; padding: 2px 0; cursor: pointer; }
+.ClassList label .Name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ClassList label .Count { margin-left: auto; font: 11px var(--FontMono); color: var(--Muted); font-variant-numeric: tabular-nums; }
+.ClassList label[hidden] { display: none; }
+.SelectionInfo { margin: 0; font: 11px/1.55 var(--FontMono); white-space: pre-wrap; word-break: break-word; }
+.SelectionInfo.Empty { color: var(--Muted); font-family: var(--FontUI); }
+.Check, .Radio { display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 1px 0; }
+input[type=checkbox], input[type=radio], input[type=range] { accent-color: var(--Accent); }
+.Range { display: grid; grid-template-columns: 70px 1fr 48px; align-items: center; gap: 6px; color: var(--Muted); font-size: 12px; }
+.Range output { font: 11px var(--FontMono); color: var(--Text); text-align: right; }
+.Note { margin: 0; color: var(--Muted); font-size: 12px; }
+.Small, .Button { background: var(--SurfaceRaised); border: 1px solid var(--Line); border-radius: 4px; padding: 4px 9px; cursor: pointer; }
+.Small:hover:not(:disabled), .Button:hover:not(:disabled) { border-color: var(--Accent); }
+.Small:disabled, .Button:disabled { color: var(--Muted); cursor: not-allowed; opacity: .7; }
+.PanelButtons { display: flex; justify-content: space-between; gap: 8px; }
+.PanelButtons .Button { min-width: 84px; padding: 6px 12px; }
+
+#StatusBar { display: flex; justify-content: space-between; gap: 12px; padding: 4px 14px 6px; font: 11px var(--FontMono); color: var(--Muted); }
+#StatusRight { text-align: right; }
+
+dialog { background: var(--SurfaceRaised); color: var(--Text); border: 1px solid var(--Line); border-radius: 8px; max-width: 420px; }
+dialog::backdrop { background: #0009; }
+dialog h2 { margin-top: 0; font-size: 18px; }
+
+@media (max-width: 760px) {
+  #App { height: auto; min-height: 100vh; }
+  body { overflow: auto; }
+  #Workspace { grid-template-columns: 1fr; padding: 0 8px 8px; }
+  #Tabs { padding: 0 8px; }
+  #ViewportArea { height: 62vh; }
+  #SidePanel { max-height: none; }
+  .Keys { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* painel de propriedades / properties panel */
+.PropertiesPanel { display: flex; flex-direction: column; gap: 8px; }
+.PropHeader { font: 11px/1.5 var(--FontMono); color: var(--Muted); }
+.PropHeader b { color: var(--Text); font: 600 13px var(--FontUI); display: block; }
+.PropGroupTitle { font: 11px var(--FontMono); color: var(--Muted); text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; }
+.TransformGrid { display: grid; grid-template-columns: 62px repeat(3, minmax(0, 1fr)); gap: 3px 4px; align-items: center; font-size: 12px; }
+.TransformGrid span { color: var(--Muted); }
+.TransformGrid input { width: 100%; min-width: 0; background: var(--Surface); border: 1px solid var(--Line); border-radius: 3px; padding: 2px 4px; font: 11px var(--FontMono); }
+.FlagList { display: flex; flex-direction: column; }
+.FlagList label { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 1px 0; }
+.FlagList label.Unconfirmed span.Name { color: var(--Muted); }
+.FlagList code { margin-left: auto; font: 10px var(--FontMono); color: var(--Muted); }
+.PropTable { width: 100%; border-collapse: collapse; font-size: 11px; table-layout: fixed; }
+.PropTable th { text-align: left; font: 10px var(--FontMono); color: var(--Muted); text-transform: uppercase; padding: 2px 4px; border-bottom: 1px solid var(--Line); }
+.PropTable td { padding: 3px 4px; border-bottom: 1px solid #ffffff0d; vertical-align: top; overflow-wrap: anywhere; }
+.PropTable td.Index { width: 28px; font-family: var(--FontMono); color: var(--Muted); }
+.PropTable td.Type { width: 58px; font-family: var(--FontMono); color: var(--Muted); }
+.PropTable td.Value { font-family: var(--FontMono); }
+.PropTable tr.Overridden td.Value { color: var(--Accent); }
+.PropTable td.Value small { display: block; color: var(--Muted); }
+.PropTable .PropName { display: block; font-family: var(--FontUI); color: var(--Text); }
+.PropFilter { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+
+/* barra do gizmo / gizmo toolbar */
+#GizmoToolbar { top: 10px; left: 10px; display: flex; align-items: center; gap: 4px; padding: 4px; flex-wrap: wrap; max-width: calc(100% - 20px); }
+.ToolButton { background: var(--Surface); border: 1px solid var(--Line); border-radius: 4px; padding: 3px 8px; cursor: pointer; font-size: 12px; }
+.ToolButton kbd { font: 10px var(--FontMono); color: var(--Muted); border: 1px solid var(--Line); border-radius: 3px; padding: 0 3px; margin-left: 2px; }
+.ToolButton[aria-pressed="true"] { background: var(--Accent); color: var(--AccentText); border-color: var(--Accent); }
+.ToolButton[aria-pressed="true"] kbd { color: var(--AccentText); border-color: var(--AccentText); }
+.ToolSep { width: 1px; height: 20px; background: var(--Line); margin: 0 4px; }
+.ToolSnap { display: flex; align-items: center; gap: 3px; font-size: 12px; color: var(--Muted); }
+.ToolSnap select { width: auto; padding: 2px 4px; font-size: 11px; }
+.TransformGrid input.Changed { border-color: var(--Accent); color: var(--Accent); }
+#StatusText.Dirty { color: var(--Accent); }
+
+/* ambiente da fase / level environment */
+.EnvPanel { display: flex; flex-direction: column; gap: 8px; }
+.EnvHead { font: 11px/1.5 var(--FontMono); color: var(--Muted); }
+.EnvHead b { color: var(--Text); font: 600 12px var(--FontUI); }
+.EnvCard { border: 1px solid var(--Line); border-radius: 5px; padding: 7px 8px; display: flex; flex-direction: column; gap: 4px; background: var(--Field); }
+.EnvCard.Main { border-color: var(--Accent); }
+.EnvCardTitle { display: flex; justify-content: space-between; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.EnvCardTitle b { font-weight: 600; }
+.EnvTag { font: 10px var(--FontMono); padding: 0 5px; border-radius: 3px; background: var(--SurfaceRaised); color: var(--Muted); white-space: nowrap; }
+.EnvTag.Shared { color: var(--Accent); background: #3a2c12; }
+.EnvFrom { font: 11px var(--FontMono); color: var(--Muted); }
+.EnvFields { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1px 10px; font-size: 11.5px; }
+.EnvFields .Label { white-space: nowrap; }
+.EnvFields .Label.Unknown { color: var(--Muted); }
+.EnvFields .Value { font-family: var(--FontMono); text-align: right; display: flex; flex-wrap: wrap; gap: 0 5px; align-items: center; justify-content: flex-end; min-width: 0; overflow-wrap: anywhere; }
+.EnvFields .Value small { color: var(--Muted); }
+.Swatch { width: 12px; height: 12px; border-radius: 2px; border: 1px solid #ffffff40; display: inline-block; }
+.EnvUsedBy { font-size: 11px; color: var(--Muted); overflow-wrap: anywhere; }
+.EnvList { display: flex; flex-direction: column; gap: 2px; }
+.EnvRow { display: grid; grid-template-columns: auto 1fr auto; gap: 6px; align-items: center; font: 11px var(--FontMono); padding: 2px 0; }
+.EnvRow .Small { padding: 1px 7px; font: 11px var(--FontUI); }
+.EnvSub { font: 11px var(--FontMono); color: var(--Muted); text-transform: uppercase; letter-spacing: .06em; margin-top: 4px; }
+
+/* outliner + abas Details / World Settings (como na Unreal) */
+.Outliner { display: flex; flex-direction: column; gap: 6px; background: var(--Field); border: 1px solid var(--Line); border-radius: 5px; padding: 7px 8px; height: 30%; min-height: 150px; }
+.OutlinerHead { display: flex; justify-content: space-between; align-items: baseline; }
+.PanelTabs { display: flex; gap: 2px; border-bottom: 1px solid var(--Line); }
+.PanelTabs button { background: none; border: 1px solid transparent; border-bottom: none; border-radius: 5px 5px 0 0; padding: 5px 12px; cursor: pointer; color: var(--Muted); font-weight: 600; font-size: 12px; margin-bottom: -1px; }
+.PanelTabs button[aria-selected="true"] { background: var(--Field); border-color: var(--Line); color: var(--Text); box-shadow: inset 0 2px 0 var(--Accent); }
+.PanelTabs button:hover { color: var(--Text); }
+.PaneNote { margin: 0; font-size: 11px; color: var(--Muted); }
+.PanelScroll[hidden] { display: none; }
+
+/* abas de recursos: Texturas, Modelos, Animação / asset tabs */
+#Workspace.AssetMode { grid-template-columns: minmax(0, 1fr); }
+#Workspace.AssetMode #ViewportArea, #Workspace.AssetMode #SidePanel { display: none; }
+.AssetPane { display: grid; grid-template-columns: 300px minmax(0, 1fr) 300px; gap: 8px; min-height: 0; }
+.AssetPane[hidden] { display: none; }
+.AssetList, .AssetInfo { display: flex; flex-direction: column; gap: 6px; min-height: 0; background: var(--Surface); border: 1px solid var(--Line); border-radius: 6px; padding: 10px; }
+.AssetInfo { overflow: auto; }
+.AssetList input[type=search], .AssetList select, .StageTools select { background: var(--Field); border: 1px solid var(--Line); border-radius: 4px; padding: 5px 7px; color: var(--Text); min-width: 0; }
+.AssetCount { font: 11px var(--FontMono); color: var(--Muted); }
+.AssetStage { position: relative; background: #0d0f0c; border: 1px solid var(--Line); border-radius: 0 6px 6px 6px; overflow: hidden; min-height: 0; }
+.StageViewport { position: absolute; inset: 0; }
+.StageViewport canvas { display: block; width: 100%; height: 100%; outline: none; }
+.StageTools { top: 10px; left: 10px; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; max-width: calc(100% - 20px); }
+.ToolGroup { display: flex; gap: 2px; }
+.StageKeys { right: 10px; bottom: 10px; }
+.StageEmpty { position: absolute; inset: 0; margin: 0; display: flex; align-items: center; justify-content: center; color: var(--Muted); pointer-events: none; }
+.StageEmpty[hidden] { display: none; }
+.ToolButton[aria-pressed="true"] { background: var(--Accent); color: var(--AccentText); border-color: var(--Accent); }
+
+/* lista de linhas (modelos, animações) */
+.AssetRows { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; border-top: 1px solid var(--Line); }
+.AssetRow { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 8px; padding: 5px 6px; border-bottom: 1px solid #ffffff0d; cursor: pointer; align-items: baseline; }
+.AssetRow:hover { background: var(--SurfaceRaised); }
+.AssetRow[aria-selected="true"] { background: #3a2c12; box-shadow: inset 2px 0 0 var(--Accent); }
+.AssetRow .Ref { font: 12px var(--FontMono); }
+.AssetRow .Name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.AssetRow .Meta { font: 11px var(--FontMono); color: var(--Muted); text-align: right; white-space: nowrap; }
+.AssetRow .Sub { grid-column: 1 / -1; font: 11px var(--FontMono); color: var(--Muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.Badge { font: 10px var(--FontMono); padding: 0 5px; border-radius: 3px; background: var(--SurfaceRaised); color: var(--Muted); }
+.Badge.Accent { color: var(--Accent); background: #3a2c12; }
+
+/* grade de texturas */
+.TexGrid { flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; align-content: start; border-top: 1px solid var(--Line); padding-top: 6px; }
+.TexTile { display: flex; flex-direction: column; gap: 2px; padding: 3px; border: 1px solid transparent; border-radius: 4px; cursor: pointer; background: none; color: inherit; text-align: left; }
+.TexTile:hover { border-color: var(--Line); }
+.TexTile[aria-selected="true"] { border-color: var(--Accent); background: #3a2c12; }
+.TexTile canvas { width: 100%; aspect-ratio: 1; display: block; border-radius: 2px;
+  background: repeating-conic-gradient(#2a2c30 0% 25%, #1c1d20 0% 50%) 0 0 / 12px 12px; image-rendering: auto; }
+.TexTile span { font: 10px var(--FontMono); color: var(--Muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.TexTile b { font: 11px var(--FontMono); font-weight: 400; color: var(--Text); }
+.TexStage { background: repeating-conic-gradient(#202226 0% 25%, #17181b 0% 50%) 0 0 / 24px 24px; }
+.TexStage canvas { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); image-rendering: pixelated; box-shadow: 0 0 0 1px #ffffff20; }
+
+
+/* painel de informações */
+.InfoTitle { font-weight: 700; font-size: 16px; overflow-wrap: anywhere; }
+.InfoSub { font: 11px var(--FontMono); color: var(--Muted); }
+.InfoGrid { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; font-size: 12px; margin: 0; }
+.InfoGrid dt { color: var(--Muted); }
+.InfoGrid dd { margin: 0; font-family: var(--FontMono); text-align: right; overflow-wrap: anywhere; }
+.InfoHeading { font: 11px var(--FontMono); color: var(--Muted); text-transform: uppercase; letter-spacing: .06em; margin-top: 6px; }
+.InfoTable { width: 100%; border-collapse: collapse; font: 11px var(--FontMono); table-layout: fixed; }
+.InfoTable th { text-align: left; color: var(--Muted); font-weight: 400; border-bottom: 1px solid var(--Line); padding: 2px 3px; }
+.InfoTable td { padding: 2px 3px; border-bottom: 1px solid #ffffff0d; overflow-wrap: anywhere; vertical-align: top; }
+.InfoTable tr.Link { cursor: pointer; }
+.InfoTable tr.Link:hover td { background: var(--SurfaceRaised); }
+.InfoActions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* linha do tempo / timeline */
+.Timeline { position: absolute; left: 10px; right: 10px; bottom: 10px; display: flex; align-items: center; gap: 10px; background: #16171ae6; border: 1px solid var(--Line); border-radius: 6px; padding: 6px 10px; }
+.Timeline select { background: var(--Field); border: 1px solid var(--Line); border-radius: 4px; padding: 3px 5px; flex: none; width: auto; }
+.Timeline > .ToolButton, .Timeline > label { flex: none; }
+.TimeTrack { position: relative; flex: 1 1 auto; min-width: 80px; }
+.TimeTrack input { width: 100%; accent-color: var(--Accent); }
+.EventMarks { position: absolute; left: 0; right: 0; top: -6px; height: 6px; pointer-events: none; }
+.EventMarks i { position: absolute; top: 0; width: 2px; height: 6px; background: var(--Accent); transform: translateX(-1px); }
+.EventMarks i.Attached { background: #6fbfac; }
+.TimeLabel { font: 12px var(--FontMono); min-width: 9ch; text-align: right; font-variant-numeric: tabular-nums; }
+#AnimStage .StageTools .BlockLabel { margin-right: -6px; }
+#AnimModel { max-width: 260px; }
+@media (max-width: 1100px) { .AssetPane { grid-template-columns: 240px minmax(0, 1fr); } .AssetInfo { grid-column: 1 / -1; max-height: 40vh; } }
+
+/* abas Áudio, STOMP e Vídeo / media tabs */
+.MediaStage { background: var(--Field); }
+.WaveCanvas { position: absolute; left: 0; right: 0; top: 0; bottom: 60px; width: 100%; height: calc(100% - 60px); cursor: pointer; }
+.StompStage .DopeSheet { position: absolute; left: 0; right: 0; top: 0; height: calc(62% - 30px); overflow: auto; border-bottom: 1px solid var(--Line); }
+.StompMap { position: absolute; left: 0; right: 0; bottom: 60px; height: calc(38% - 30px); width: 100%; }
+.DopeRow { display: grid; grid-template-columns: 190px minmax(0, 1fr); border-bottom: 1px solid #ffffff0d; min-height: 24px; }
+.DopeRow.Head { position: sticky; top: 0; background: var(--Surface); z-index: 2; border-bottom: 1px solid var(--Line); }
+.DopeName { padding: 3px 8px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-right: 1px solid var(--Line); cursor: pointer; }
+.DopeName small { display: block; font: 10px var(--FontMono); color: var(--Muted); overflow: hidden; text-overflow: ellipsis; }
+.DopeRow.Selected .DopeName { background: #3a2c12; }
+.DopeLane { position: relative; }
+.DopeLane i { position: absolute; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 2px; cursor: pointer; transform: rotate(45deg); border: 1px solid #0006; }
+.DopeLane i.Selected { outline: 2px solid var(--Text); }
+.DopeLane .Playhead, .DopeRuler .Playhead { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--Accent); pointer-events: none; }
+.DopeRuler { position: relative; height: 22px; font: 10px var(--FontMono); color: var(--Muted); }
+.DopeRuler span { position: absolute; top: 4px; transform: translateX(-50%); }
+.EventLegend { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11px; color: var(--Muted); }
+.EventLegend b { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; transform: rotate(45deg); }
+#VideoPlayer { position: absolute; inset: 10px; width: calc(100% - 20px); height: calc(100% - 20px); background: #000; object-fit: contain; }
+.Spoken { font-size: 12px; font-style: italic; color: var(--Text); border-left: 2px solid var(--Accent); padding: 2px 8px; margin: 4px 0; }
+
+/* sombras dinâmicas / dynamic shadows */
+.ShadowBlock { border-top: 1px solid var(--Line); margin-top: 8px; padding-top: 8px; }
+.ShadowFade { display: flex; align-items: center; gap: 6px; margin: 4px 0; font-size: 12px; color: var(--Muted); }
+.ShadowFade input { width: 64px; background: var(--Field); color: var(--Text); border: 1px solid var(--Line); border-radius: 4px; padding: 2px 4px; font: 12px var(--FontMono); }
+.ShadowToggle { display: flex; align-items: center; gap: 6px; margin: 6px 0 2px; font-size: 12px; }
+.ShadowToggle small { color: var(--Muted); }
+
+/* flags alteradas / changed flags */
+.FlagList label.Changed .Name { color: var(--Accent); }
+.FlagList label.Changed::after { content: '•'; color: var(--Accent); margin-left: 4px; }
+
+/* links e entradas/saídas / links and message slots */
+.SlotBadge { display: inline-block; font: 10px var(--FontMono); padding: 0 4px; border-radius: 3px; margin-right: 6px; }
+.SlotBadge.In { background: #2c4a63; color: #cfe6ff; }
+.SlotBadge.Out { background: #5a4214; color: #ffe2a8; }
+.LinkSends { font: 11px var(--FontMono); color: var(--Text); margin: 4px 0; word-break: break-word; }
+.LinkTable tr.Link { cursor: pointer; }
+.LinkTable tr.Link:hover td { background: #ffffff0d; }
+.LinkTable tr.Missing td { color: var(--Danger); }
+
+/* seletor de cor e editor de luz / colour picker and light editor */
+.RenderTitle.Sub { margin-top: 8px; }
+.LightEditor { display: grid; gap: 8px; margin: 6px 0 10px; }
+.ColorPicker { background: #232323; border: 1px solid var(--Line); border-radius: 6px; padding: 8px; display: grid; gap: 8px; }
+.CpTop { display: flex; gap: 8px; align-items: flex-start; }
+.CpWheel { width: 150px; height: 150px; cursor: crosshair; touch-action: none; }
+.CpValue { width: 16px; height: 150px; border-radius: 3px; cursor: ns-resize; touch-action: none; }
+.CpSwatches { display: grid; gap: 2px; font-size: 11px; color: var(--Muted); flex: 1; min-width: 50px; }
+.CpSwatches button { height: 28px; border: 1px solid #555; border-radius: 3px; cursor: pointer; }
+.CpSwatches button:disabled { cursor: default; }
+.CpSliders { display: grid; gap: 4px; }
+.CpRow { display: grid; grid-template-columns: 14px 1fr 58px; gap: 6px; align-items: center; font: 11px var(--FontMono); }
+.CpTrack { display: block; height: 12px; border-radius: 3px; border: 1px solid #444; }
+.CpTrack input { width: 100%; margin: 0; height: 12px; opacity: 0.85; background: transparent; accent-color: #fff; }
+.CpRow input[type=number], .CpHex input, .LightNumber { background: var(--Field); color: var(--Text); border: 1px solid var(--Line); border-radius: 3px; padding: 1px 4px; font: 11px var(--FontMono); width: 100%; }
+.CpHex { display: flex; gap: 6px; align-items: center; font: 11px var(--FontMono); justify-content: flex-end; }
+.CpHex input { width: 80px; }
+.LightRow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 12px; }
+.LightIntensity { display: flex; gap: 6px; align-items: center; flex: 1; }
+.LightIntensity input[type=range] { flex: 1; accent-color: var(--Accent); }
+.LightNumber { width: 64px !important; }
+
+/* edição de propriedades / property editing */
+.PropInput { width: 100%; max-width: 160px; background: var(--Field); color: var(--Text); border: 1px solid var(--Line); border-radius: 3px; padding: 1px 4px; font: 11px var(--FontMono); }
+select.PropInput { max-width: 200px; }
+.PropSwatch { display: inline-flex; align-items: center; gap: 6px; background: var(--Field); color: var(--Text); border: 1px solid var(--Line); border-radius: 3px; padding: 1px 6px; font: 11px var(--FontMono); cursor: pointer; }
+.PropSwatch::before { content: ''; width: 14px; height: 14px; border-radius: 2px; background: var(--Swatch); border: 1px solid #0008; }
+.PropTable tr.Edited td.Index::after { content: ' •'; color: var(--Accent); }
+.ColorPopup { position: fixed; z-index: 50; width: 290px; box-shadow: 0 10px 30px #000a; }
+.ColorPopupClose { position: absolute; right: 6px; top: 4px; z-index: 2; background: none; border: none; color: var(--Muted); font-size: 18px; cursor: pointer; }
+
+/* PT: reprodução de STOMP na fase / EN: STOMP playback in the level */
+#StompBar { top: 54px; left: 50%; transform: translateX(-50%); width: min(620px, calc(100% - 20px)); display: flex; flex-direction: column; gap: 6px; z-index: 3; }
+#StompBar[hidden], #StompSubtitle[hidden] { display: none; }
+.StompBarRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.StompBarRow b { font-size: 12px; max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#StompBarLog { margin: 0; max-height: 72px; overflow: auto; font: 11px/1.45 var(--FontMono); color: var(--Muted, #969890); white-space: pre-wrap; }
+#StompBarLog:empty { display: none; }
+#StompSubtitle { position: absolute; left: 50%; bottom: 140px; transform: translateX(-50%); max-width: min(720px, calc(100% - 40px)); padding: 6px 14px;
+  background: #000000b8; color: #f2efe6; font-size: 15px; line-height: 1.4; text-align: center; border-radius: 4px; pointer-events: none; z-index: 3; }
+#ViewportArea.StompMode #InfoOverlay, #ViewportArea.StompMode #KeysOverlay, #ViewportArea.StompMode #SelectionOverlay { display: none; }
+.PropSlider { display: inline-flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
+.PropSlider input[type=range] { flex: 1 1 auto; min-width: 40px; width: 0; accent-color: var(--Accent); }
+.PropSlider .PropInput { flex: 0 0 7ch; width: 7ch; min-width: 0; }
+.PropCheck { accent-color: var(--Accent); width: 16px; height: 16px; }
+
+.RenderRange { justify-content: space-between; }
+.RenderRange input[type=range] { width: 96px; }
+.PerfLine { font: 11px var(--FontMono); color: var(--Muted); max-width: 230px; overflow-wrap: anywhere; padding: 1px 0; }
+.PerfLine.Warn { color: #e0a33c; }
+.RenderRange select { width: auto; min-width: 72px; }

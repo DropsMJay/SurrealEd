@@ -1,0 +1,165 @@
+<title>Riot Property Atlas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@400;500;600&family=Spectral:wght@500;600&display=swap">
+<style>
+/* Layout: two-pane reference browser — class index on the left, property ledger on the right; stacks on phones. */
+:root{
+  --bg:#eef0ec; --panel:#f8f9f6; --line:#d3d8d0; --fg:#1d2420; --muted:#5d6a62;
+  --accent:#2f6f62; --accent-soft:#d6e7e1; --code-bg:#e4e8e2; --warn:#8a5a12; --chip:#e7ebe5;
+  --display:"Spectral",Georgia,serif; --ui:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141917; --panel:#1b211e; --line:#2d3631; --fg:#dde4df; --muted:#8c9a92;
+  --accent:#6fbfac; --accent-soft:#1f3631; --code-bg:#101412; --warn:#d9a65a; --chip:#232b27; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141917; --panel:#1b211e; --line:#2d3631; --fg:#dde4df; --muted:#8c9a92;
+  --accent:#6fbfac; --accent-soft:#1f3631; --code-bg:#101412; --warn:#d9a65a; --chip:#232b27; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--ui);font-size:15px;line-height:1.45}
+.App{display:grid;grid-template-columns:minmax(240px,300px) minmax(0,1fr);height:100%;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px;gap:16px;box-sizing:border-box}
+.Index{display:flex;flex-direction:column;min-height:0;gap:10px}
+.Brand h1{font-family:var(--display);font-weight:600;font-size:1.5rem;margin:0;text-wrap:balance;letter-spacing:.01em}
+.Brand p{margin:.2rem 0 0;color:var(--muted);font-size:.85rem}
+input[type=search]{width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg);font:inherit}
+input[type=search]:focus-visible,button:focus-visible,.ClassItem:focus-visible,tr.Row:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.Games{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.Games button{font:inherit;font-weight:500;text-align:left;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg);cursor:pointer;display:flex;flex-direction:column;line-height:1.25}
+.Games button small{font-family:var(--mono);font-size:.7rem;color:var(--muted);font-weight:400}
+.Games button[aria-selected=true]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.Filters{display:flex;gap:12px;flex-wrap:wrap;font-size:.85rem;color:var(--muted)}
+.Filters label{display:flex;gap:5px;align-items:center;cursor:pointer}
+.ClassList{overflow:auto;min-height:0;flex:1;border-top:1px solid var(--line)}
+.ClassItem{display:grid;grid-template-columns:1fr auto;gap:6px;padding:7px 8px;border-bottom:1px solid var(--line);cursor:pointer;align-items:baseline}
+.ClassItem:hover{background:var(--chip)}
+.ClassItem[aria-selected=true]{background:var(--accent-soft)}
+.ClassItem .Name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ClassItem .Cov{font-family:var(--mono);font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.ClassItem .Cov b{color:var(--accent);font-weight:500}
+.Main{min-width:0;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+.Head{padding:18px 20px 12px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:6px 24px;align-items:baseline}
+.Head h2{font-family:var(--display);font-weight:600;font-size:1.6rem;margin:0;flex-basis:100%;text-wrap:balance}
+.Meta{display:flex;gap:18px;flex-wrap:wrap;font-size:.85rem;color:var(--muted)}
+.Meta span b{color:var(--fg);font-family:var(--mono);font-weight:500;font-variant-numeric:tabular-nums}
+.Legend{padding:10px 20px;font-size:.8rem;color:var(--muted);border-bottom:1px solid var(--line);display:flex;gap:16px;flex-wrap:wrap}
+.TableWrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:720px}
+th{position:sticky;top:0;background:var(--panel);text-align:left;font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);z-index:1}
+td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top;font-size:.88rem}
+td.N{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--muted);width:3.2em}
+td.T{font-family:var(--mono);font-size:.8rem;white-space:nowrap}
+td.V{font-family:var(--mono);font-size:.8rem;min-width:0;word-break:break-word}
+td.V .X{color:var(--muted)}
+td.O{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;width:4em}
+td.O.Hot{color:var(--warn);font-weight:500}
+tr.Row.HasCode{cursor:pointer}
+tr.Row.HasCode:hover td{background:var(--chip)}
+tr.Row.Dim td{color:var(--muted)}
+.Chip{display:inline-block;font-family:var(--mono);font-size:.72rem;padding:1px 6px;border-radius:4px;background:var(--chip);margin:1px 3px 1px 0;white-space:nowrap}
+.Chip.D0{background:var(--accent-soft);color:var(--accent)}
+.Chip.Msg{outline:1px solid var(--accent)}
+.Ref{color:var(--accent)}
+tr.Detail td{background:var(--bg);padding:10px 14px}
+.Snip{margin:0 0 10px}
+.Snip header{font-size:.78rem;color:var(--muted);margin-bottom:4px;display:flex;gap:10px;flex-wrap:wrap}
+.Snip header b{font-family:var(--mono);color:var(--fg);font-weight:500}
+pre{margin:0;background:var(--code-bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;overflow-x:auto;font-family:var(--mono);font-size:.78rem;line-height:1.5}
+pre mark{background:var(--accent-soft);color:var(--accent);border-radius:3px;padding:0 2px}
+.Empty{padding:40px 20px;color:var(--muted)}
+@media (max-width:760px){
+  .App{grid-template-columns:1fr;height:auto}
+  .ClassList{max-height:40vh}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<div class="App">
+  <aside class="Index">
+    <div class="Brand"><h1>Riot Property Atlas</h1><p>Properties of each class and the code that reads them</p></div>
+    <div class="Games" role="tablist" aria-label="Game"><button id="GameTS1" role="tab">The Suffering<small>Suffering.rfl</small></button><button id="GameTTB" role="tab">Ties That Bind<small>SufferingTTB.rfl</small></button></div>
+    <input type="search" id="Search" placeholder="Search class name or hash" aria-label="Search classes">
+    <div class="Filters">
+      <label><input type="checkbox" id="OnlyCode" checked> only classes with code reads</label>
+      <label><input type="checkbox" id="OnlyUsed"> only props read by code</label>
+    </div>
+    <div class="ClassList" id="ClassList" role="listbox" aria-label="Classes"></div>
+  </aside>
+  <main class="Main" id="Main"></main>
+</div>
+<script type="application/json" id="Data">__DATA__</script>
+<script>
+const All=JSON.parse(document.getElementById('Data').textContent);
+let Game='ts1', Classes=All.ts1.classes, Snips=All.ts1.snips;
+const GameButtons={ts1:document.getElementById('GameTS1'),ttb:document.getElementById('GameTTB')};
+function SetGame(g){Game=g;Classes=All[g].classes;Snips=All[g].snips;Current=null;for(const k in GameButtons) GameButtons[k].setAttribute('aria-selected',String(k===g));}
+const ListEl=document.getElementById('ClassList'), MainEl=document.getElementById('Main');
+const SearchEl=document.getElementById('Search'), OnlyCodeEl=document.getElementById('OnlyCode'), OnlyUsedEl=document.getElementById('OnlyUsed');
+let Current=null;
+const Esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function Coverage(c){let n=0;for(const p of c[5]) if(p[6].length) n++;return n;}
+function SlotLabel(s){return s==='msg'?'message map':(s===70?'slot 70 · OnMessage':'slot '+s);}
+function KindLabel(k){return {f:'float use',a:'array use',i:'int/ref use','?':'use unclear'}[k]||k;}
+function RenderList(){
+  const q=SearchEl.value.trim().toLowerCase(), only=OnlyCodeEl.checked;
+  const html=[];
+  Classes.forEach((c,i)=>{
+    const cov=Coverage(c);
+    if(only&&!cov) return;
+    if(q&&!(c[0].toLowerCase().includes(q)||c[1].toLowerCase().includes(q))) return;
+    html.push(`<div class="ClassItem" role="option" tabindex="0" data-i="${i}" aria-selected="${i===Current}"><span class="Name">${Esc(c[0])}</span><span class="Cov"><b>${cov}</b>/${c[5].length}</span></div>`);
+  });
+  ListEl.innerHTML=html.join('')||'<div class="Empty">No class matches.</div>';
+}
+function Highlight(code,n){
+  return Esc(code).replace(new RegExp('GetProp\\('+n+'\\)','g'),m=>'<mark>'+m+'</mark>');
+}
+function RenderClass(i){
+  Current=i; const c=Classes[i]; const onlyUsed=OnlyUsedEl.checked;
+  try{history.replaceState(null,'','#'+Game+'-c'+c[1].slice(2).toLowerCase());}catch(e){}
+  const cov=Coverage(c);
+  let rows='';
+  c[5].forEach((p,n)=>{
+    const [type,tname,distinct,values,refs,over,reads]=p;
+    if(onlyUsed&&!reads.length) return;
+    const vals=values.map(([v,k])=>`${Esc(v)} <span class="X">×${k}</span>`).join('<br>');
+    const ref=refs.length?'<div>'+refs.map(([v,k])=>`→ <span class="Ref">${Esc(v)}</span> <span class="X">×${k}</span>`).join('<br>')+'</div>':'';
+    const chips=reads.map(r=>`<span class="Chip ${r[2]===0?'D0':''} ${r[1]==='msg'?'Msg':''}" title="${Esc(SlotLabel(r[1]))}, call depth ${r[2]}, ${KindLabel(r[3])}">${Esc(r[0].replace('FUN_',''))}</span>`).join('');
+    rows+=`<tr class="Row ${reads.length?'HasCode':'Dim'}" data-n="${n}" ${reads.length?'tabindex="0" aria-expanded="false"':''}><td class="N">${n}</td><td class="T">${Esc(tname)}</td><td class="V">${vals||'<span class="X">no template</span>'}${ref}</td><td class="O ${over?'Hot':''}">${over||''}</td><td>${chips||''}</td></tr>`;
+  });
+  MainEl.innerHTML=`<div class="Head"><h2>${Esc(c[0])}</h2><div class="Meta">
+    <span>class <b>${c[1]}</b></span><span>properties <b>${c[5].length}</b></span><span>read by code <b>${cov}</b></span>
+    <span>templates <b>${c[2]}</b></span><span>level instances <b>${c[3]}</b></span>${c[4]?`<span>vtable <b>${c[4]}</b></span>`:'<span>data-only class (read through references)</span>'}</div></div>
+    <div class="Legend"><span><span class="Chip D0">func</span> read directly in a method of this class</span><span><span class="Chip">func</span> read in a helper it calls</span><span>Overrides = how many level instances change this value</span><span>Click a row to see the code</span></div>
+    <div class="TableWrap"><table><thead><tr><th>#</th><th>Type</th><th>Values in templates</th><th>Overrides</th><th>Read by</th></tr></thead><tbody>${rows||'<tr><td colspan="5" class="Empty">No property is read by code in this class.</td></tr>'}</tbody></table></div>`;
+  RenderList();
+}
+function ToggleRow(tr){
+  const next=tr.nextElementSibling;
+  if(next&&next.classList.contains('Detail')){next.remove();tr.setAttribute('aria-expanded','false');return;}
+  const c=Classes[Current], n=+tr.dataset.n, reads=c[5][n][6];
+  const html=reads.map(r=>{
+    const code=r[4]>=0?Highlight(Snips[r[4]],n):'(no snippet: the decompiler could not place this call)';
+    return `<div class="Snip"><header><b>${Esc(r[0])}</b><span>${Esc(SlotLabel(r[1]))}</span><span>depth ${r[2]}</span><span>${KindLabel(r[3])}</span><span>call at ${Esc(r[5])}</span></header><pre>${code}</pre></div>`;
+  }).join('');
+  const d=document.createElement('tr'); d.className='Detail'; d.innerHTML=`<td colspan="5">${html}</td>`;
+  tr.after(d); tr.setAttribute('aria-expanded','true');
+}
+ListEl.addEventListener('click',e=>{const it=e.target.closest('.ClassItem'); if(it) RenderClass(+it.dataset.i);});
+ListEl.addEventListener('keydown',e=>{if(e.key==='Enter'){const it=e.target.closest('.ClassItem'); if(it) RenderClass(+it.dataset.i);}});
+MainEl.addEventListener('click',e=>{const tr=e.target.closest('tr.Row.HasCode'); if(tr) ToggleRow(tr);});
+MainEl.addEventListener('keydown',e=>{if(e.key==='Enter'){const tr=e.target.closest('tr.Row.HasCode'); if(tr) ToggleRow(tr);}});
+SearchEl.addEventListener('input',RenderList);
+OnlyCodeEl.addEventListener('change',RenderList);
+OnlyUsedEl.addEventListener('change',()=>{if(Current!==null) RenderClass(Current);});
+function FromHash(){
+  const m=(location.hash||'').match(/^#(ts1|ttb)-c([0-9a-f]+)$/);
+  if(m&&m[1]!==Game) SetGame(m[1]);
+  const h=m?m[2]:'';
+  const i=Classes.findIndex(c=>c[1].slice(2).toLowerCase()===h);
+  return i>=0?i:Classes.findIndex(c=>c[0]==='Player');
+}
+window.addEventListener('hashchange',()=>{const g=Game,i=FromHash(); if(i!==Current||g!==Game) RenderClass(i);});
+for(const k in GameButtons) GameButtons[k].addEventListener('click',()=>{if(k===Game) return; const name=Current!==null?Classes[Current][0]:'Player'; SetGame(k); let i=Classes.findIndex(c=>c[0]===name); if(i<0) i=Classes.findIndex(c=>c[0]==='Player'); RenderClass(Math.max(0,i));});
+SetGame('ts1');
+RenderClass(Math.max(0,FromHash()));
+</script>

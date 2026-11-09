@@ -613,7 +613,7 @@ Vertex shaders (`xvsh`) have matching fragments: `xvsLightPoint`, `xvsLightSpot`
 - Level Properties default (System.odu #0x9): **p14 = 15, p15 = 30**; no level overrides them (all 18 TS1 levels).
 - Caster test at 0x492AC2: shadow only if `fadeEnd × max(radius, 100) ≥ dist² × k`.
 
-**Higher resolution (patch, untested in-game):** change both the `push 0x100` and the `cmp ebp,0x100` to 0x200/0x400. Tool: `riot_patch.py <exe> --shadow 512|1024` (checks original bytes, keeps `.orig`, `--restore`). Distance of shadows: raise Level Properties p14/p15 in `System.odu` #0x9.
+**Higher resolution (tested in-game at 1024 in TS1 with RiotFix 1.3.4; see 9j for the texture cache):** change both the `push 0x100` and the `cmp ebp,0x100` to 0x200/0x400. Tool: `riotfix/RiotPatch.py <exe> --shadow 512|1024` (checks original bytes, keeps `.orig`, `--restore`). Distance of shadows: raise Level Properties p14/p15 in `System.odu` #0x9.
 
 - **Which objects cast (lvl_ReadInstance 0x45A5C0).** With instance flag 0x1000 the instance decides (0x400 → object +8
   bit 0x1000000, 0x800 → bit 0x2000000). Without it both come from the template object's flags (+0x20), which are the
@@ -649,7 +649,7 @@ Vertex shaders (`xvsh`) have matching fragments: `xvsLightPoint`, `xvsLightSpot`
 - Skinned models (0x0208) have a per-model LOD table. Table at model +0xD4 (count +0xDC, stride 0x14), distance squared at load (0x47B0E6).
 - Selection `0x46B220` (TTB 0x470CC0), called once from 0x492B0D (TTB 0x496B5B) with the **squared camera distance** (camera pos at `[0x5C5D74]+0x8C`). Switch to coarser when dist² > LOD[i+1]² + h, finer when dist² < LOD[i]² − h; h = 1048576 (TS1) / 0.25 (TTB). **No global multiplier.**
 - Values: TS1 has 26 two-LOD models, all in NPCs.mdu, second LOD at 20480 (=10 model units) for most, also 24576/30720/47104. TTB: 42 (NPCs + Player Weapon and FX), second LOD at 6 or 10 model units (some keep TS1's 20480 = effectively never).
-- Ways to change: edit the LOD floats in the `.mdu` (0x0208 table), or `riot_patch.py <exe> --lod0` (replaces `mov edx,[esp+0x20]` at 0x492B07 / TTB 0x496B55 with `xor edx,edx` → always LOD 0).
+- Ways to change: edit the LOD floats in the `.mdu` (0x0208 table), or `riotfix/RiotPatch.py <exe> --lod0` (replaces `mov edx,[esp+0x20]` at 0x492B07 / TTB 0x496B55 with `xor edx,edx` → always LOD 0).
 - **Static models also have LODs**, via resource **0x0207** (reader 0x484020): `u16 lower-detail model id, u16 higher-detail model id, f switch distance` (squared at load), then sphere, box, `i16` type + typed list. The distance sits on the lower-detail model. Selection `0x491800(model, dist²)` (TTB 0x495870), called at 0x492B23 (TTB 0x496B71), same hysteresis; object flag 0x400000 blocks the switch. Only 7 TS1 chains, all in Prison Common (0xC08→0xC32→0xE0B and 0xC09→0xE0C→0xE0D at 12/18 units: the floor grates of 1a, 2 and 3b; 0x697→0xB5B; 0x767→0xB57; 0xB58→0xB59). RiotFix 1.1 scales both selections.
 - **Cull Distance Multiplier** (TS1 only): float at `0x5C6D1C` = registry blob `HKCU\SOFTWARE\Surreal\Riot Engine\SettingsDX105` (REG_BINARY, 0x184 bytes) offset **0xDC**, default 1.0 (set at 0x4054B7), no UI. Multiplies each object's cull distance (object +0x74) at 0x491A1D/0x49116B/0x4989DB/0x493586; also clamped by `[0x5C6DF4]×2048`. The debug-menu entry only displays it (×100). TTB's settings struct has no such field.
 - Other debug entries (inert in retail, values only stored in the menu array): Landscape LOD (id 0x4C), Display Layer LOD Levels (0x3F), Landscape Texture Resolution (0x3D), Light Radius Cutoff Factor (0x34).
@@ -759,6 +759,56 @@ Built-in classes (not in the `.rfl`) are named in a table at **0x5BB348** (28-by
 ## 9j. RiotFix (runtime patch DLL)
 
 `dinput8.dll` proxy (both games import only `DirectInput8Create` from it). Reads `RiotFix.ini`, writes `RiotFix.log`; recognises the game by the bytes at 0x492AE2 / 0x496B30. Options: shadow texture resolution (push + cmp), shadow distance scale (hooks the fade setter's vtable slot: TS1 0x58CA68 → 0x4084A0 with ints; TTB 0x5E6CE4 → 0x409B40 with floats, stores squares into 0x74FC00/04/08), character LOD distance scale (redirects the call to the LOD selector, scaling dist² by 1/k²; 0 = always LOD 0), cull distance multiplier (TS1 only: repoints the six `fld [0x5C6D1C]` operands to the DLL's own float).
+
+**RiotFix 1.3 additions (facts from the exe; not yet tested in-game):**
+- **Casters:** ShadowMgr::Add reads the menu option at TS1 0x4CEEA0 `mov edx,[0x5C6D00]` / TTB 0x4DC590 `mov eax,[0x639EE0]`. RiotFix replaces that load with the chosen value: 1 = player, 2 = characters, 3 = all. The main on/off (option 0) is checked elsewhere and is left alone.
+- **MinAngle:** the light-direction function is TS1 0x4CC020 / TTB 0x4D9FC0.
+  - thiscall with one argument (`ret 4`), one caller (TS1 0x4CDFD6 / TTB 0x4DB757);
+  - it writes the normalised light − caster vector at this+0xE;
+  - the clamp is `fcomp [sin45]` at TS1 0x4CC16C (0x595B54) / TTB 0x4DA10C (0x5F0DB8).
+  - RiotFix points that operand to −2, so the clamp never fires, and wraps the call in C: when y < sin θ it sets y = horizontal × tan θ and renormalises. No hand-written assembly.
+- **Crash log:** now records the process memory (free address space, largest free block, private bytes) and whether the exe is Large Address Aware. The dump adds FullMemoryInfo and ThreadInfo.
+  - Both exes ship without LAA (2 GB). `riotfix/RiotPatch.py --laa` sets the flag (1 byte).
+- **The Oct 26 crash dump** (TS1, shadows 1024, LOD ×2):
+  - EIP = 0x4E after `call [edx+0x6C]` at 0x44932D, on a secondary thread;
+  - the object's vtable is 0x591010, the resource base class (constructor 0x4665D0), which the destructor 0x466B00 restores and which has only 24 slots, so +0x6C lands on a string;
+  - deduction: a resource used after (or during) its destruction;
+  - out of memory is plausible but not proven, because the dump had no memory counters.
+
+
+**Render to texture and depth (1.3.2).** Facts (code): TS1 renderer `[0x6DD650]`, vtable 0x593BF8. Slot 12
+(0x49AF40) saves the current render target and depth-stencil (this+0xE8 / +0xEC, device +0x98 / +0xA0) and
+the viewport, then calls SetRenderTarget(0, texture level 0) only. Slot 14 (0x49B0F0) restores the target and
+viewport. No SetDepthStencilSurface (+0x9C) call was found next to the device field (+0x268) anywhere in the exe,
+so the shadow pass keeps the screen's depth buffer. ShadowMgr::Add creates one 32-bit render-target texture of
+N×N per caster (0x4CB600 → 0x4481C0, flags 0x480001). TTB's equivalent (0x49FDF0) calls
+CreateDepthStencilSurface(+0x74) with the texture size and SetDepthStencilSurface. Deduction: with N bigger than
+the screen depth buffer, D3D9 rendering into the texture fails (black screen reported with Resolution=1024;
+the user's screen size is not known yet). RiotFix 1.3.2 wraps slots 12 / 14 in C: when the texture is larger than
+the saved depth buffer it creates one of the texture size (same format, no multisample, discard), clears it,
+binds it, and on end binds the saved buffer back and releases it, as TTB does per pass. The first pass logs
+both sizes. Installed only when Resolution ≠ 256; TS1 only.
+1.3.2 declared the begin hook with one argument. The exe shows `ret 8` (0x49B03C) and the shadow pass calls it with
+(texture, 1), so the stack shifted by 4 bytes: crash at the first shadow (EBP = 0x4CD8C5, the return address
+into 0x4CD550; execution reached a texture object at 0x15246A2C). 1.3.3 passes both arguments and checks the
+`ret 8` / `ret` bytes before installing. The user's log showed screen depth 1920x1080, so the depth rule does not
+explain the black screen with Resolution=1024 on that machine; that cause is still open.
+
+**Texture cache budget (1.3.4).** Facts (code): resource managers are `[0x5DC828 + 4·type]`; type 3 is the
+texture manager 0x5C8BD0 (vtable 0x590198; slot 1, 0x4627A0, sets the budget at +4; +8 is the amount in use).
+Every resource created through FUN_004637F0 registers callback 0x463650, which adds slot 4 of the resource
+(textures: 0x445100, pitch × height + 0x6C) to +8 once loaded. Over budget, the loader (0x463920) recycles a
+loaded resource to make room. Shadow textures come from the same manager (0x4CB600 → 0x4481C0, flags 0x480001,
+used only there). Facts (two dumps, Resolution=1024, LOD 1.0 and 2.0): budget 10,538,188 bytes (10.05 MB), in use
+10,537,112 and 10,576,448; two shadow slots of 1024 (2 × 4 MB). The crashes 0x449330 (resource with the base vtable
+0x591010) and 0x4488A1 (GetSurfaceLevel failed, then the game releases a null surface) are both in the loader path
+0x4684B0 → 0x448FC0. The LOD=1.0 test still crashed, so the LOD hook is not required for the crash.
+Deduction: the shadows fill the cache and constant recycling exposes a race in the game's loader. RiotFix 1.3.4
+wraps slot 4 of vtable 0x58FFE0 (texture constructor 0x446F40) and, for textures with flags 0x480000 and side > 256,
+reports the size they would have at 256, so the budget behaves as in the original game.
+In-game test (1.3.4, Resolution=1024, LOD 2.0): level loads normally, cache 4,411 of 10,291 KB at the first
+shadow, ~10 min without a crash, sharper shadows. Source renamed to RiotFix.c (English UpperCamelCase, PT+EN
+comments, English log messages); riot_patch.py → riotfix/RiotPatch.py.
 
 ## 9f. The Suffering: Ties That Bind (2005)
 
@@ -1231,3 +1281,280 @@ RiotEffects.py header). Pass colour = saturate(2 × texture × colour) in gamma 
   local radius; near the camera alpha × (depth − 0.15625) / (0.75 × radius). p4 and p10 (fader) not used by the preview.
   Small open point: the sample count is taken from the counting loop at 0x4B6159..0x4B61CC.
 - Not drawn yet: Fire, Volumetric Fog/Rain, DripMorphingModel, Particle System - Complex/Group, TTB Object Generator.
+
+
+## 9y. Sky Properties p0/p1/p6/p7/p8 (TS1 Suffering.rfl, base 0x6DB00000)
+
+- Loader 0x6DC2B2F0 copies P0, P1, P2, P3, P8, P4, P5, P6, P7 into the sky state (+0, +4, +8, +0xC, +0x10, +0x14,
+  +0x18, +0x1C, +0x20); 0x6DC2B880 blends the same fields towards another Sky Properties (switchers).
+- 0x6DC2B4C0 (**from asm**): a = P1 × π/180, b = P0 × π/180, vector = (cos b·cos a, sin a, −sin b·cos a), passed to
+  the sky-texture builder 0x6DC2AD70 and the sky draw 0x6DC2B110. So P0 = yaw and P1 = pitch of a direction, in
+  degrees. What the direction drives on screen is not traced yet.
+- P6/P7 = horizon band / blend of the dome strip (as the editor's dome already uses). P8 (+0x10): read and blended,
+  use not found.
+- Class names/types the .rfl/.exe reader misses fall back to Riot/RiotClassNames.json (from the Ghidra pass); the
+  editor now prefers the .rfl named after the game .exe.
+
+
+## 9z. SurrealEd: Material, Scripting and Strings tabs; saving from the original
+
+- **Strings (.xdu 0x0400):** `u16 byte length` + UTF-16LE, the length includes the terminator. Some strings end in
+  **two** NUL characters (e.g. TS1 `2_0011` "Death House"), so the writer keeps the original's NUL count. Re-encoding every
+  string gives all 2037 TS1 and 3638 TTB chunks back byte for byte.
+- **Scripting:** the level logic is the instance `Links` list (target ids, i16 count + u32 each, written back by
+  `WriteInstances`) plus the output/input message properties from RiotMessageMaps.json. A source sends each output
+  message to ALL its links; a target reacts when an input property (or a fixed input of the class) holds that message.
+  The tab shows "entry points" (objects nobody links to) and the chain downstream of each.
+- **Materials:** slot meanings as in RiotMaterials.py. Unnamed slots (e.g. Advanced p5, p9, p12–p17) are shown raw.
+  Landscape Material is now fully named (section 9z2).
+
+### 9z2. Material slot types and Landscape Material (Suffering.exe)
+- **Class table in the exe** (`.data` around 0x5BB3xx, 28-byte entries): `hash, 0x14, 6, name*, property count,
+  group count, groups*`. Each group is `count, list*` of property type codes, in slot order. This gives the type of every
+  slot of the built-in material classes, matching every slot already known:
+  - Simple: `0:4003 1:000E 2:0007`
+  - Advanced: `0:4003 1:000E 2:0007 3:0007 4:000F 5:0007 6–8:0002 9–10:0012 11–12:0007 13:0002 14:0007 15–16:0002 17:0007`
+  - Animating: `0:4003 1:100E 2:0002 3–5:0007 6:000F 7:0007`
+  - Layered: `0:4003 1:4003 2:3003`
+  - Landscape: `0:4003 1:0007 2:5003 3:000E 4:0001 5:0007 6–8:0002`
+  - Landscape Water (13): `0:4003 1:0007 2:5003 3:000E 4–5:0002 6:0001 7–8:0002 9:0001 10–11:0002 12:3003`
+- **Slot 0** of every material class points (in all data checked) to a **Game Material Properties** object
+  (class 0x3E862B1B, name from the rfl class table; 5 props: ref, 4 floats). What the game does with it (footsteps,
+  impacts…) is not traced.
+- **Landscape Material (0xB13556E7)**, read by the terrain code:
+  - p1 + p2 (FUN_004AAF80): p2 is a list of other landscape materials (`(count << 16) | offset`, items after p8).
+    For each pair of materials in a chunk the code builds a 0/1 matrix that starts at 1. If p1 = 1, materials *not* in
+    the list are set to 0; if p1 = 0, materials *in* the list are set to 0. The matrix is then used when building the
+    per-vertex splat bytes. Name used: "blend list mode" / "blend list" (the exact visual effect is a deduction).
+  - p4 (FUN_004A4A80): int; texture scale = `1 / (p4 × 2048)`, i.e. the texture repeats every p4 units.
+  - p5: int, not read anywhere in the exe; 0 in all 84 TS1 landscape materials.
+  - p6 (comparator FUN_004AAE80, used by FUN_004AB6E0): float; the material list of each chunk (max 10) is kept
+    sorted by p6, lower first, ties by template id. Deduction: that order is the pass order (lower = drawn first, below).
+  - p7 (FUN_004994F0): float; the splat pass is drawn only while the camera distance² < (p7 × 2048)².
+  - p8 (FUN_004994F0, second loop): float; same test for an extra pass that runs only if debug options 90 "Splat Base
+    Only" and 91 "Splat Disable Noise" are off and the texture has flag bits 0xF0000. 0 in all TS1 data (never drawn).
+  - Values in TS1 (84 materials): p1 0 ×76 / 1 ×8; p4 1–4; p6 1–10; p7 30 ×58, 20 ×23, 99 ×2, 15 ×1; p8 0.
+- **Note on the test exe:** the `Suffering.exe` used here has an extra section `.Torque`. The p7 multiply reads
+  16384.0 from that section (0x6F8170), while the p8 one reads the original 2048.0 (0x58C9A8), so this copy was
+  patched (most likely a draw-distance patch): the splat distance is 8× the original in it.
+- **Saving from the original:** `RebuildFromOriginal` (RiotContainer.py) rebuilds a file from its backup, replacing only
+  the chunks whose final content differs. Undoing every change therefore gives the original file back byte for byte
+  (tested: a link added and removed in 1a, two strings changed and restored in System.xdu). Used by level, template,
+  texture and string saves.
+
+### 9z3. STOMP writer and editing (SurrealEd)
+- `WriteSequence` (RiotMedia.py) is the inverse of `ParseSequence`: the header is kept whole (TS1 `<IfII`, TTB
+  `<IIfIfII`), only Flags, Radius and the track count are taken from the edited data; each track keeps its name bytes
+  as read (u16 length + bytes, padding included); event counts come from the lists.
+- **Round trip tested on every sequence:** 186 TS1 + 341 TTB give the same bytes back, also after a trip through JSON
+  (floats read from f32 survive as doubles).
+- In all 527 original sequences the events of each track are in time order, so the writer keeps them sorted (stable);
+  the edit indexes in the browser and the decoded view therefore match.
+- Save = only the 0x0311 chunk of that sequence is replaced, rebuilt from the original backup (`RebuildFromOriginal`):
+  edit + save + undo + save, or "Back to original", gives the original .qdu back (md5 checked on 1a PrisonDeathRow.qdu).
+- Pose keys from the editor: file quaternion = (−x, −y, −z, w) of the object/camera rotation, position × PositionScale
+  (2048 TS1, 1 TTB). Keying the view camera and playing it back gives the same camera within f32 precision (4e-6).
+- **Not proven yet:** that the game accepts edited sequences (needs the in-game test), and the meaning of TTB event
+  types 2 and 8, of the transform key's u32 at index 7 and of the TTB transform extras (edited only as raw values).
+  Adding/removing tracks is not supported (track header fields A and C are not understood).
+
+- **Effects in the STOMP preview:** message keys (type 7) are resolved on the server by `RiotMessageFlow.py` (the target
+  reacts when one of its inputs holds the message; Particle Fountain p50/p51/p52, Object Generator p32/p33/p34,
+  Fire p19/p20, through Message Relay p4→p8 and Visibility Toggler p1/p2/p3). The player rebuilds the on/off state of
+  each effect from the messages up to the current time, so play, rewind and jumps agree. 93 of the 364 message keys
+  of 1a PrisonDeathRow switch effects. Timers, Detectors and other time/player-driven classes are not simulated.
+
+### 9z4. Message Relay, Sound Effect, Ambient Sound (TS1, Suffering.rfl)
+Method: the message-map records (`-1, P, handler`, replayed with the same Unicorn setup as RiotMessageMaps.py) give the
+function each input runs; those functions were decompiled in Ghidra. Names are in RiotProperties.py; "(?)" = deduction.
+- **Message Relay 0xD44B5953** (setup 0x6DBCB9C0): p0 → enabled flag (+0xC); p1 → uses left (+0x10; < 1 = −1 unlimited);
+  p2 ≠ 0 builds a list of the links. Inputs: p4 relay (0x6DBCBC50), p5 enable (0x6DBCB880: +0xC = 1), p6 disable
+  (0x6DBCB890: +0xC = 0), p7 destroy (0x6DBCB870 = vtable+0x30, the same function as other "Destroy" inputs).
+  Relay: only when enabled and uses ≠ 0; each relay decrements the uses and the object destroys itself when they reach 0.
+  p2 = 0 → output p8 to all links; p2 = N → N links, each sent p8 directly (the original sender is kept). p3 picks
+  the link: 0 = first of the list and removes it (in order), 2 = random and removes it, 1 = random (whether it is
+  removed depends on a register the decompiler lost: "(?)"). An empty list is rebuilt from the links.
+- **Sound Effect 0xED6B2FF8**: p14 play (0x6DC2CE90 → 0x6DC2C9A0), p15 stop (0x6DC2C560: stops with p12 passed to
+  the sound system's stop call), p16 prefetch (0x6DC2C5A0, only when object flags & 0x30 = 0), p17 destroy.
+  Output p18 fired by the update (0x6DC2CCC0) in mode p3 = 0 when the sound is no longer playing.
+  p0 = sound list; p3 mode: 2/3/4 repeat after a pause = p6 + random ± (p7, "(?)") + p13; 0/1/2 pick a random sound,
+  3/4 use another picker (0x6DB41650); 4 destroys the object once it has played more times than there are sounds.
+  p9 = where the sound plays: 0 the object (or p11 objects), 1 the player, 2 another global object (?), 3 the object in p10.
+- **Ambient Sound 0xE6EC6C84**: a threshold. The update measures the listener's position in the object's local frame:
+  value = clamp(0.5 − z_local / 2048, 0, 1) (constants 0.5, 1/2048 read from the .rfl), inside a radius (+0x40, squared).
+  value > 0.5 (−Z side): reverb p9 (a "Reverb Effect Template" 0xF7BB7912) at p10 × 0.01, Player flag 0x8 at +0x9C set
+  from p13, output **p21**; otherwise (+Z side): p14, p15, p18, output **p22** (0x6DB92910). Input p19 forces the +Z
+  side (0x6DB92D60), p20 the −Z side (0x6DB92DD0). The automatic extractor missed outputs 21/22 (the index travels as a
+  float in a register); they are added by hand (ExtraOutputs). p1–p4 / p5–p8 as the sound sets of each side and the
+  floats p11/p12/p16/p17 are not traced yet.
+- TTB: Sound Effect and Ambient Sound have the same slot types; Message Relay differs (14 slots). Names are applied to
+  TS1 only until the TTB code is checked.
+
+### 9z5. Message slot names for every class with a message map (TS1)
+- `Ghidra/Atlas/RiotMessageHandlers.py` (variant of RiotMessageMaps.py) records, per class, the handler of each input
+  (inherited ones included) and the functions that fire each output → `Riot/RiotMessageHandlers.json` (106 classes).
+- The 217 distinct handlers used by classes that appear linked in TS1 levels, plus the 43 output-firing functions, were
+  decompiled in one Ghidra pass and read one by one. Names live in `Riot/RiotSlotNames.py` ("(?)" = inference).
+- Inherited slots are named by handler address (same function = same behaviour): GameObject p11 blow up (vt+0x84),
+  p12 destroy (vt+0x88), p13/p14 invulnerability (vt+0x7C/+0x80); output p15 fired when damage > 0 (0x6DBA31B0),
+  p21 when health ≤ 0, followed by self-destroy (0x6DB9B410). Usable objects: p28/p29 → vt+0xD8(1/0) (allow/block
+  use); output p27 from vt slot 0xEC, which the Player's use code calls (0x6DB36240) → "used by the player".
+  Items: p52 → vt+0x9C(player); outputs p53 (state 4, shown again) and p54 (state 5, hidden, pickup sound p48).
+  "Action objects" (Speech Player, Damage/Adrenaline/Reputation senders, Inventory Add Remove…): p1 = 0x6DB8E510, target
+  from p0 (0 sender, 1 player, 2 every link). NPCs: p136 clears / p137 sets flag 0x10000; output p28 fired where the
+  dead flag 0x800 is set.
+- Per-class names are needed because one generic function can mean opposite things: 0x6DC2EAA0 clears +0x10, which
+  enables a Detector (it fires only while +0x10 = 0) but disables a Behavior Changer (it acts only while +0x10 ≠ 0).
+- Highlights (facts): Timer — delay p2 ± random p3, output p11 when it runs out, then p5 ≠ 0 destroys it and p4 = 0
+  stops it (no repeat). Detector — p7 enter, p8 touch again while inside, p9 leave; p2 = one object at a time and the
+  detector removes itself after it leaves. Count Down To Zero — p3 +1, p4 −1, p5 reset to p0, p6 at zero, p1 destroys.
+  Switch — FUN_6DC314E0 fires p64 when it turns on, p65 when it turns off. Time Scale — speed p0 % reached over p1 s,
+  back to normal over p2 s. Object Cloner — p15 per clone, p16 when the count p1 runs out, p17 when no clone is left.
+- Coverage: 544 of 645 message slots of the classes that appear linked in TS1 levels. Open: NPC outputs 30/32/34/168/169,
+  Switch 68/69 and Mechanism 55–58 (fired by Player code), Pushable 53/55, Help Popup p10. TTB not checked.
+
+### 9z6. Game Material Properties and Material Type (TS1, Suffering.rfl)
+- Class table entries in the .rfl (0x6DC728CC, 0x6DC72E44): **Game Material Properties** 0x3E862B1B (5 props: ref,
+  4 floats) and **Material Type** 0x623454A0 (no properties: it is only an identity, like an enum value).
+- Every render material's slot 0 points to a Game Material Properties object, whose p0 is a Material Type
+  (2_0369…2_0385 in System). Lookup: FUN_6DBB6310(material) → the material's Game Material Properties; if the ref is a
+  Material Type it logs "Material [0x%0x] refers to Material TYPE instead of Material PROPERTY!" and falls back to a
+  default from a global object (its p17).
+- The Material Type is the key of the "… Material Effects" tables (Player, NPC, Missile, Melee Weapon, Burrower, and the
+  water variants): FUN_6DBC7790 scans a list of effect templates and returns the one whose p0 equals the type, or the one
+  with p0 = −1 as the default. The water tables use only 2_036F, so 2_036F is the water type (inference from names).
+- p1: FUN_6DBB05B0 (used by player/NPC code) looks the effects table up only when p1 = 0 (0 in all 62 templates).
+- p2: Missile/Lightning hit code (FUN_6DBD0490, vtable slot 21) reads it and clamps it to 0–1; the use of the result
+  was lost by the decompiler (x87), so its meaning is open.
+- p3: BurnFX (FUN_6DB9C530 ← FUN_6DB9D0B0, vtable slot 3) averages p3 over the burning object's surfaces (max 1) and
+  multiplies the fire value by it → how much the surface burns (meaning inferred from that use).
+- p4 (0 or 50): no read found yet.
+
+### 9z7. Fire (TS1 0x1D84210F)
+- Update function FUN_6DBAC6E0 (vtable slot 6), facts:
+  - p1 ≠ 0: the model is turned to face the camera (FUN_6DB0D070 builds a look-at matrix: local Z on the
+    camera↔object line; with p1 = 1 the height difference is zeroed → only turns around the vertical axis).
+  - The scale per axis moves from its current value toward a target (fields +0x5C/+0x68/+0x74, rates from p3..p8),
+    times the instance scale; p3..p5 are the values it starts from (0.001 in most fires = invisible).
+  - A value moves from p11 toward p12 and is written to the object at +0xD0 (intensity? not traced).
+  - Inputs (9z5): p19 ignite (FUN_6DBACD00), p20 put out (FUN_6DBACFA0), p21 destroy.
+- Inferences: p6..p8 = lit scale (the targets read with p3..p5); p0 = lit at start (all 15 corridor fires of
+  1a PrisonDeathRow have p0 = 0 and start at 0.001; fires with p0 = 1 start near p6..p8).
+- Editor: Fire models are drawn with the game's camera-facing matrix at the lit scale; a fire with p0 = 0 shows only
+  when selected, with "show effects that start off", or after a STOMP message lights it (RiotMessageFlow p19/p20).
+- The model itself (e.g. 3_032C: three crossed flame cards, 48-frame flipbooks, additive) is intact; the selection
+  wireframe just shows every crossing card.
+- The icon of a Fire with p0 = 0 is drawn dimmed, so an unlit fire is visible as such.
+
+### 9z8. Lighting Effect, engine message maps (TS1, Suffering.exe)
+
+**Lighting Effect (0x6968CE68, engine class).** Facts from the exe:
+- Class table row 0x5BB3E4 (18 slots): p0, p1 int; p2–p5 message; p6, p7 colour; p8 waveform (`.wdu`); p9, p10 float + p11 waveform; p12, p13 float + p14 waveform; p15, p16 float + p17 waveform.
+- Constructor 0x4C5AE0 registers the message map 0x5BA480: **p2 → 0x4C49D0 (on: enables the per-frame update), p3 → 0x4C49F0 (off), p4 → 0x4C4A20 (destroy)**. p5 has no handler.
+- Start (0x4C4C40): p0 ≠ 0 = active from the start; collects the Point/Spot Lights among its links.
+- Tick (0x4C5820): time += dt. For each loaded curve: t = fmod(time, duration), s = (curve(t) + 1) × 0.5 (curve vt+0x60 with (t, 0, 1)). With p1 = 0 a curve stops after one pass.
+  - Colour (0x4C4F20) = p6 + (p7 − p6) × s per channel (/255), written to the linked lights.
+  - Radius (0x4C5450) = p9 + (p10 − p9) × s, × 4194304, written to light +0x54. The Point Light stores its own p8 in the same field with the same factor (0x4C60B0), so p9/p10 are in p8's units.
+  - p12–p17 (0x4C5260 / 0x4C5630) are applied only to Spot Lights (0x4C8BD0 / 0x4C8C10).
+- A **Point Light with p3 ≠ −1** creates, at start, an object from the p3 template linked to itself (0x4C6CA0). In TS1 those templates are Lighting Effects in World Common; that is how the flickering lamps work (1a: 24 of 258 lights).
+- Example, 1a: the red alarm light #31116 (p6 = 0, off) and Lighting Effect #32789 (p0 = 0) are linked from STOMP Player #23454, whose output p7 ("finished", message 1) fires at the end of the opening sequence 12_002b. Message 1 = p2 of the effect and p4 of the light, so the alarm starts pulsing after the cutscene (radius 0 → 8 with curve 7_0002).
+
+**Engine-class message maps.** Built by static initialisers at 0x5878xx (same `-1, P, handler` format as the `.rfl` maps) and registered by each constructor through vt+0x34:
+
+| Class | Map | Inputs |
+|---|---|---|
+| Point Light 0x7DFFD694 | 0x5BA500 | p4 on (0x4C6150), p5 off (0x4C6190) |
+| Ambient Light 0x7578F3F7 | 0x5BA558 | p4 on (0x4C5D80), p5 off (0x4C67B0) |
+| Directional Light 0x6B110672 | 0x5BA5B0 | p4 on (0x4C5E30), p5 off (0x4C69E0) |
+| Spot Light 0x54E01F83 | 0x5BA648 | p4 → vt+0x44, p5 → vt+0x48 (on/off not confirmed) |
+| Portal 0x5B0BAD74 | 0x5BA3E8 | p5 (0x4C0340) clears flag 1 of both rooms; p6 (0x4C02E0) sets it (open/close not confirmed) |
+| Lighting Effect 0x6968CE68 | 0x5BA480 | p2 on, p3 off, p4 destroy |
+
+**Editor.**
+- Lighting Effects that start active animate in the Level tab. The animated colour and radius are an overlay on the saved light values, so edits and saving never see them.
+- Details has "▶ Animate light" on a Lighting Effect, and on a Point Light driven by one. It turns on the effect and its lights, as the game's message does.
+- The STOMP preview also follows p2/p3/p4 (RiotMessageFlow).
+- TTB is not checked.
+- Performance: relighting is per vertex on the CPU, and the 1a terrain is a single instance that costs about 230 ms to relight. Animating all 23 effects every 50 ms gave about 270 ms per frame. Now:
+  - only effects within 30 units of the camera animate (a forced preview animates at any distance);
+  - the animation steps every 0.1 s;
+  - large instances (3000+ vertices) relight only the vertices within the effect's reach;
+  - relighting runs from a queue, nearest first, within 4 ms per frame.
+  - Measured: about 3 ms per frame among flickering lights, 0.2 ms in the overview.
+
+**Other facts from this pass.**
+- Texture 10_01AC (the second layer of 10_030E) is entirely black (DXT1, every block colour 0). In blend "add" it adds nothing in-game either.
+- 1a: nothing is placed behind the door in the courtyard alcove (x ≈ 454, z > 598) in 1a, 1b, 1c or 10. The door pieces are Static Objects (9_1039 / 9_103A / 9_0FFA).
+- TTB: thousands of logic objects sit at exactly y = 0, e.g. 1,973 of 3,655 Timers, 1,748 Message Relays and 1,055 Behavior Changers. Link lines to them go down to the origin height; the editor now marks each link end with a dot.
+- TTB "Particle System - Simple" (0x607B301C): FUN_019ACA80 in SufferingTTB.rfl configures the engine particle object from the properties (p40: 1 → flag 2, 2 → flag 4, i.e. the blend). The emission direction is not set there; it comes from the exe particle code, which is not read yet. The editor's axis (local Z) is still an inference.
+
+### 9z9. TTB intro titles and flashes (00a_Prison_Riot, STOMP 116_000C)
+
+- STOMP type-7 events are real messages. In 116_000C, message 1 goes to three **GUI Launchers** (#7596/#7597/#7598) at 2.72 / 5.59 / 9.13 s, and to six **Screen Faders** ("Flash 1–6") between 7.69 and 12.34 s.
+- The chain for one title:
+  - GUI Launcher p2 → **Simple Text HUD** template (116_0051 / 0053 / 0052);
+  - its p18 list → **HUD Texture** template (3_1B3B / 1B65 / 1B64);
+  - the HUD Texture's p29 → texture 3_05E4 "Midway Presents" (256×64), 3_05EC "A Game by Surreal Software" (512×64) or 3_05ED "The Suffering: Ties That Bind" (512×64);
+  - p32/p33 hold the same sizes (256 or 512 × 64). The textures are stored bottom-up.
+- **Screen Fader** (0x21C015A3), 12 in 00a:
+  - p6 = full-screen texture (e.g. 3_05AD, 3_0579: the memory-flash images, 256×256);
+  - p7 = colour, p8 = 0.5 or 1.0 (opacity?);
+  - p1/p2 = 0.05–0.15 s (fade in / hold?);
+  - p9 = a ref (sound?);
+  - p13–p16 = messages.
+  - Meanings are from the values only; not yet read in code.
+- Also present in 00a: Insanity Screen Flash (0x64254E79), Screen Colorization (0xC6A811A2, p0 = texture 3_05B5), Time Scale.
+- These screen effects are object classes, not shaders. The shader files hold only vertex shaders (lighting, fog, texture coordinates) plus a few pixel shaders: TS1 BW and SetAlpha00; TTB adds ColorizeFromAlpha and LuminanceToAlpha, probably for Screen Colorization (not confirmed).
+
+**Read in SufferingTTB.rfl.**
+- **GUI Launcher** (0x2AB838A7):
+  - Message map 0x1A3F958: p5 → FUN_01997E60 (open), p6 → FUN_019980D0.
+  - FUN_01997E60 switches on p0. With p0 = 0 it calls FUN_019EE4E0(p4, self, p2), which builds the widget of template p2 (FUN_019CEE20) and starts it (vt+0x80).
+- **Widgets** (Simple Text HUD 0x77D5366F, HUD Texture 0x1265CB3F):
+  - Layout, FUN_019CB530: x = W·p1/100, y = H·p3/100, width = W·p4/100, height = H·p5/100.
+    - W and H are the screen size in pixels, with X0 = Y0 = 0 (FUN_019C9610).
+    - p6 = 1 sets the scale to W/640 and H/448; otherwise it is 1.
+  - Children, FUN_019CD4A0: the p18 list creates HUD Texture widgets (FUN_019D56F0); the p19 list creates text widgets (FUN_019CECA0).
+  - Timing, FUN_019D1BB0 / FUN_019D1DE0 / FUN_019D1F10:
+    - p20 ≠ 0 enables the display timer, which lasts p21 s;
+    - p24 > 0: slide in from (p25 %, p26 %) over p24 s, and back out at the end (FUN_019D1C70);
+    - p24 = 0: closes at once.
+  - HUD Texture drawing, FUN_019D5780 / FUN_019D58A0:
+    - texture p29;
+    - source region p30, p31 + p32 × p33 pixels (0 = the whole texture);
+    - colour white (grey 0x7F7F7F when disabled);
+    - alpha = widget +0x14 × 255, set to 1.0 at creation (0x19CB79F).
+  - In the video "Midway Presents" stays about 2 s and "Ties That Bind" about 3 s, which matches p21 of their Simple Text HUDs (2.0 / 3.0).
+- **Screen Fader** (0x21C015A3):
+  - Message map 0x1A401A0: p15 → start (FUN_019A4700: state 1, timer = p0); p14 → destroy; p13 → sets draw flag +0x1E; p16 → prefetch texture p6 and sound p9.
+  - Tick, FUN_019A4C30:
+    - waits for p6 and p9 to load;
+    - state 1 (p0 s): alpha = p8 · (1 − t/p0);
+    - state 2 (p1 s): alpha = p8;
+    - state 3 (p2 s): alpha = p8 · t/p2;
+    - at the end, p4 = 1 destroys the object, otherwise it resets;
+    - the sound p9 plays when p10 = 0, 1 or 2 (start, hold, out).
+  - FUN_019A4AA0: with no object from p12, adds a full-screen entry (texture p6, colour p7, alpha) to the overlay list 0x1A40108 (FUN_019A2640). The blend of that list is not read.
+- **Editor:**
+  - RiotScreenFx.py adds `Event.Screen` to STOMP message events;
+  - RiotScreenOverlay.js draws the titles and flashes over the viewport during the STOMP preview (normal alpha blend; the game's blend is not read).
+- **Not found yet:** why the in-game screen is black behind the titles. The camera key has flags 0x600 (position only; rotation and scale are left alone); no Screen Fader in 00a is black.
+
+
+## 9z10. SurrealEd: glTF export of models and animations
+
+`Editor/RiotGltfExport.js` writes glTF 2.0 binary from the data the viewer already reads (no new format facts):
+- one primitive per material group (LOD 0 corners, as in the `.mdu`), normals from the packed bytes, UVs with v
+  flipped because the PNGs are written upright (`.tdu` rows are bottom-up);
+- skeleton: one node per bone with the local bind pose, inverse bind matrices straight from 0x0208, every non-zero
+  weight (JOINTS_n / WEIGHTS_n in sets of 4, normalised by the sum as the viewer does); corners without weights go to an
+  extra "Unskinned" joint with identity, because they do not move in the viewer;
+- animation: the exact `.adu` keys per track (rotation; translation from the key or the track's rest value), LINEAR;
+  untracked bones keep the bind pose (the viewer's "untracked root children follow the pelvis" rule is a viewer choice
+  and is not exported); duration, loop and events go to `animations[0].extras`;
+- the game blend mode goes to `material.extras.RiotBlend`; add/sub/mod2x… become BLEND + KHR_materials_unlit.
+
+Checks: Khronos glTF Validator 0 errors / 0 warnings (TS1 NPCs 10_0002, Prison Common 9_0697, TS1 and TTB 10_0002 with
+10_0001). Skinning the file with plain glTF rules matches the viewer's pose to 1e-6 at 0.5 s and 1.3 s in both games.
+That comparison found a viewer issue: three.js `slerp` returns the first key unchanged when two near-equal keys have
+norm > 1 (dot ≥ 1); the viewer now normalises both keys first.

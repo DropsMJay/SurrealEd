@@ -37,7 +37,7 @@ import sys
 from .RiotWaveforms import RiotWaveformStore
 from .RiotLevel import InstanceProperties, RiotLevel
 from .RiotEffects import RiotEffectBuilder
-from .RiotLighting import PointLights, RiotBakedLight, WorldLights
+from .RiotLighting import LightEffects, PointLights, RiotBakedLight, WorldLights
 from .RiotPackages import RefName
 
 LittleEndian = sys.byteorder == 'little'
@@ -410,7 +410,20 @@ class RiotSceneBuilder:
             import traceback
             traceback.print_exc()
             Effects = []
+        try:
+            Fires = self.Effects.Fires(Level.Instances, {Row[6]: Number for Number, Row in enumerate(Instances)})
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            Fires = []
         World = WorldLights(Level.Instances, self.Templates, Scale)
+        try:
+            LightFx, LightWaves = LightEffects(Level.Instances, self.Templates, self.Waveforms, Game.IsTTB)
+            self._Waves.update(LightWaves)
+        except Exception:   # PT: nunca derruba a fase / EN: never breaks the level
+            import traceback
+            traceback.print_exc()
+            LightFx = []
         # PT: camadas do céu (Sky / Sun): p0 = visível, p6 = 1 marca a cúpula (o centro); o editor as desenha em volta da câmera
         # EN: sky layers (Sky / Sun): p0 shown, p6 = 1 marks the dome (the centre); drawn around the camera
         Sky = []
@@ -438,7 +451,7 @@ class RiotSceneBuilder:
         Scene = {
             'Game': Game.Game, 'Key': LevelInfo['Key'], 'File': LevelInfo['File'], 'Name': LevelInfo['Name'],
             'Models': Models, 'Instances': Instances, 'Lit': LitBlock, 'Lights': Lights, 'Start': Start,
-            'SystemPackage': self.SystemPackage, 'ShadowFade': ShadowFade, 'Waves': self._Waves, 'WorldLights': World, 'Sky': Sky, 'Effects': Effects,
+            'SystemPackage': self.SystemPackage, 'ShadowFade': ShadowFade, 'Waves': self._Waves, 'WorldLights': World, 'Sky': Sky, 'Effects': Effects, 'Fires': Fires, 'LightEffects': LightFx,
             'Textures': sorted(RefName(*Ref) for Ref in TextureRefs),
             'Stats': {'Records': len(Level.Instances), 'Complete': Level.InstancesComplete, 'Placed': len(Instances) - (1 if TerrainGroups else 0),
                       'Models': len(Models) - (1 if TerrainGroups else 0), 'TerrainTriangles': sum(Group['n'] for Group in TerrainGroups) // 3,

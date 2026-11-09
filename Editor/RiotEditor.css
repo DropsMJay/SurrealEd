@@ -50,11 +50,11 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 /* área de trabalho */
 #Workspace { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 8px; padding: 0 14px 8px; min-height: 0; }
 #ViewportArea { position: relative; background: #0d0f0c; border: 1px solid var(--Line); border-radius: 0 6px 6px 6px; overflow: hidden; min-height: 0; }
-#Viewport { position: absolute; inset: 0; }
+#Viewport { position: absolute; inset: 34px 0 0 0; }
 #Viewport canvas { display: block; width: 100%; height: 100%; outline: none; }
 
 .Overlay { position: absolute; background: #16171ae6; border: 1px solid var(--Line); border-radius: 6px; padding: 8px 10px; }
-#InfoOverlay { top: 54px; left: 10px; max-width: min(320px, calc(100% - 20px)); pointer-events: none; }
+#InfoOverlay { top: 76px; left: 10px; max-width: min(320px, calc(100% - 20px)); pointer-events: none; }
 .InfoFile { font: 11px var(--FontMono); color: var(--Accent); text-transform: uppercase; letter-spacing: .06em; }
 .InfoName { font-weight: 700; font-size: 18px; line-height: 1.15; margin: 2px 0 4px; overflow-wrap: anywhere; }
 .InfoStats { display: grid; grid-template-columns: auto auto; gap: 1px 10px; margin: 0; font: 11px var(--FontMono); color: var(--Muted); }
@@ -63,7 +63,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .RenderTitle { font: 11px var(--FontMono); color: var(--Muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 2px; }
 .Keys { right: 10px; bottom: 10px; font: 11px/1.6 var(--FontMono); color: var(--Muted); pointer-events: none; text-align: right; }
 .Keys kbd { font: inherit; color: var(--Text); border: 1px solid var(--Line); border-radius: 3px; padding: 0 4px; }
-#SelectionOverlay { right: 10px; top: 54px; max-width: min(360px, calc(100% - 20px)); margin: 0; font: 11px/1.5 var(--FontMono); white-space: pre-wrap;
+#SelectionOverlay { right: 10px; top: 44px; max-width: min(360px, calc(100% - 20px)); margin: 0; font: 11px/1.5 var(--FontMono); white-space: pre-wrap;
   word-break: break-word; border-color: var(--Accent); }
 #SelectionOverlay[hidden] { display: none; }
 #Loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
@@ -335,7 +335,7 @@ select.PropInput { max-width: 200px; }
 .ColorPopupClose { position: absolute; right: 6px; top: 4px; z-index: 2; background: none; border: none; color: var(--Muted); font-size: 18px; cursor: pointer; }
 
 /* PT: reprodução de STOMP na fase / EN: STOMP playback in the level */
-#StompBar { top: 54px; left: 50%; transform: translateX(-50%); width: min(620px, calc(100% - 20px)); display: flex; flex-direction: column; gap: 6px; z-index: 3; }
+#StompBar { top: 44px; left: 50%; transform: translateX(-50%); width: min(620px, calc(100% - 20px)); display: flex; flex-direction: column; gap: 6px; z-index: 3; }
 #StompBar[hidden], #StompSubtitle[hidden] { display: none; }
 .StompBarRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .StompBarRow b { font-size: 12px; max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -354,3 +354,197 @@ select.PropInput { max-width: 200px; }
 .PerfLine { font: 11px var(--FontMono); color: var(--Muted); max-width: 230px; overflow-wrap: anywhere; padding: 1px 0; }
 .PerfLine.Warn { color: #e0a33c; }
 .RenderRange select { width: auto; min-width: 72px; }
+
+/* ---- viewport header / cabeçalho do visor ---- */
+#ViewHeader { position: absolute; top: 0; left: 0; right: 0; height: 34px; display: flex; align-items: center; gap: 2px; padding: 0 6px;
+  background: var(--Surface); border-bottom: 1px solid var(--Line); z-index: 4; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+#ViewHeader .ToolSep { height: 18px; margin: 0 5px; flex: none; }
+.IconButton { flex: none; width: 28px; height: 26px; display: grid; place-items: center; background: none; border: 1px solid transparent; border-radius: 4px;
+  color: var(--Text); cursor: pointer; padding: 0; }
+.IconButton:hover { background: var(--SurfaceRaised); }
+.IconButton[aria-pressed="true"] { background: var(--Accent); color: var(--AccentText); }
+.IconButton svg, .ToolSnap svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+#ViewHeader .ToolSnap { flex: none; gap: 2px; padding: 0 2px; }
+#ViewHeader .ToolSnap select { border: 1px solid var(--Line); background: var(--Field); height: 22px; }
+.HeaderMenu { flex: none; background: none; border: 1px solid transparent; border-radius: 4px; color: var(--Text); font-size: 12.5px; padding: 3px 9px; cursor: pointer; }
+.HeaderMenu:hover, .HeaderMenu[aria-expanded="true"] { background: var(--SurfaceRaised); border-color: var(--Line); }
+.HeaderSpacer { flex: 1; }
+.HeaderStats { flex: none; font: 11px var(--FontMono); color: var(--Muted); margin-right: 6px; white-space: nowrap; }
+.HeaderStats[hidden] { display: none; }
+.ViewPill { position: absolute; top: 42px; left: 10px; z-index: 3; background: #16171ad9; border: 1px solid var(--Line); border-radius: 4px; color: var(--Text);
+  font-size: 12px; padding: 3px 9px 3px 6px; cursor: pointer; }
+.ViewPill:hover, .ViewPill[aria-expanded="true"] { border-color: var(--Accent); }
+.DropMenu { position: absolute; z-index: 20; min-width: 270px; max-width: calc(100% - 12px); overflow-y: auto; background: var(--Surface); border: 1px solid var(--Line);
+  border-radius: 6px; padding: 4px; box-shadow: 0 8px 24px #0009; }
+.DropMenu[hidden] { display: none; }
+.DropItem { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 6px; width: 100%; background: none; border: 0; border-radius: 4px;
+  color: var(--Text); font-size: 12.5px; text-align: left; padding: 4px 8px 4px 4px; cursor: pointer; }
+.DropItem:hover:not(:disabled) { background: var(--SurfaceRaised); }
+.DropItem:disabled { color: var(--Muted); cursor: default; opacity: 0.6; }
+.DropKey { font: 11px var(--FontMono); color: var(--Muted); white-space: nowrap; }
+.DropMark { width: 12px; height: 12px; justify-self: center; }
+.DropItem.check .DropMark { border: 1px solid var(--Muted); border-radius: 2px; }
+.DropItem.check[aria-checked="true"] .DropMark { background: var(--Accent); border-color: var(--Accent);
+  box-shadow: inset 0 0 0 2px var(--Surface); }
+.DropItem.radio .DropMark { border: 1px solid var(--Muted); border-radius: 50%; }
+.DropItem.radio[aria-checked="true"] .DropMark { border-color: var(--Accent); background: radial-gradient(var(--Accent) 45%, transparent 50%); }
+.DropSep { height: 1px; background: var(--Line); margin: 4px 6px; }
+#RenderOverlay { left: auto; right: 10px; top: 44px; bottom: auto; max-height: calc(100% - 56px); overflow-y: auto; z-index: 5; }
+#RenderOverlay[hidden], #InfoOverlay[hidden], #KeysOverlay[hidden] { display: none; }
+#RenderOverlay .RenderTitle { display: flex; justify-content: space-between; align-items: center; }
+.PanelClose { background: none; border: 0; color: var(--Muted); font-size: 16px; cursor: pointer; padding: 0 2px; line-height: 1; }
+.PanelClose:hover { color: var(--Text); }
+#ViewportArea.StompMode .ViewPill { display: none; }
+
+/* ---- STOMP tab ---- */
+.StompPane { grid-template-columns: minmax(0, 1fr) 320px; }
+.StompMain { display: grid; grid-template-rows: minmax(220px, 1fr) auto auto minmax(150px, 34%); gap: 0; min-height: 0; background: var(--Field);
+  border: 1px solid var(--Line); border-radius: 6px; overflow: hidden; }
+.StompPreview { position: relative; background: #0d0f0c; min-height: 0; overflow: hidden; }
+.StompPreview #Viewport { inset: 0; }
+.StompPreviewTitle { position: absolute; top: 10px; left: 12px; z-index: 2; display: flex; flex-direction: column; pointer-events: none;
+  text-shadow: 0 1px 3px #000; }
+.StompPreviewTitle b { font-size: 15px; }
+.StompPreviewTitle span { font: 11px var(--FontMono); color: var(--Muted); }
+.StompPreviewNote { position: absolute; top: 10px; right: 12px; z-index: 2; font-size: 12px; color: var(--Muted); background: #16171ad9;
+  border: 1px solid var(--Line); border-radius: 4px; padding: 3px 8px; }
+.StompPreviewSubtitle { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 2; max-width: calc(100% - 40px); padding: 6px 14px;
+  background: #000000b3; border-radius: 4px; font-size: 15px; text-align: center; }
+.StompPreviewNote[hidden], .StompPreviewSubtitle[hidden] { display: none; }
+.StompPreview .StageEmpty { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; z-index: 1; }
+.StompTransport { position: static; border-radius: 0; border-left: 0; border-right: 0; border-top: 1px solid var(--Line); border-bottom: 1px solid var(--Line); background: var(--Surface); }
+.StompMain .DopeSheet { position: static; height: auto; overflow: auto; border: 0; }
+.StompSide { gap: 6px; }
+.StompSide #StompList { flex: 1; min-height: 120px; }
+.StompDetails summary { cursor: pointer; font-size: 12px; color: var(--Muted); padding: 4px 0; }
+.StompDetails[open] { max-height: 40vh; overflow: auto; }
+.SideActions { display: flex; justify-content: space-between; gap: 8px; padding-top: 6px; border-top: 1px solid var(--Line); }
+@media (max-width: 1100px) { .StompPane { grid-template-columns: minmax(0, 1fr); } .StompMain { min-height: 70vh; } }
+.StompPreview .StageEmpty[hidden] { display: none; }
+
+/* ---- node graph / editor de nós ---- */
+.GraphPane { grid-template-columns: minmax(0, 1fr) 320px; }
+.GraphMain { display: flex; flex-direction: column; min-height: 0; background: var(--Field); border: 1px solid var(--Line); border-radius: 6px; overflow: hidden; }
+.GraphArea { position: relative; flex: 1; min-height: 200px; }
+.GraphToolbar { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-bottom: 1px solid var(--Line); background: var(--Surface); font-size: 12px; }
+.GraphHint { font-size: 11px; }
+.GraphSide #MaterialList, .GraphSide #ScriptList { flex: 1; min-height: 120px; }
+.SideNote { font-size: 11px; margin: 0; }
+.NodeGraph { position: relative; overflow: hidden; outline: none; cursor: grab;
+  background-color: #141518; background-image: radial-gradient(#2a2d32 1px, transparent 1px); background-size: 22px 22px; }
+.NodeSurface { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.NodeWires { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+.Wire { fill: none; stroke: #9aa093; stroke-width: 2; }
+.Wire.Dashed { stroke-dasharray: 6 5; stroke: #6c706a; }
+.Wire.Selected { stroke: var(--Accent); stroke-width: 3; }
+.Wire.Preview { stroke: var(--Accent); stroke-dasharray: 4 4; }
+.WireHit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer; }
+.WireLabel { font: 10px var(--FontMono); fill: #c9c6bd; paint-order: stroke; stroke: #141518; stroke-width: 3px; pointer-events: none; }
+.Node { position: absolute; width: 220px; background: var(--Surface); border: 1px solid #44484f; border-radius: 6px; box-shadow: 0 4px 14px #0008;
+  font-size: 12px; cursor: default; }
+.Node.Selected { border-color: var(--Accent); }
+.Node.Root { box-shadow: 0 0 0 2px #e0a33c55, 0 4px 14px #0008; }
+.Node.Muted { opacity: 0.6; }
+.NodeHead { padding: 4px 8px; border-radius: 5px 5px 0 0; cursor: move; display: flex; flex-direction: column; background: #33363c; }
+.NodeHead b { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.NodeHead small { font: 10px var(--FontMono); color: #cfccc4b0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.NodeThumb { display: block; width: calc(100% - 12px); margin: 6px; height: auto; border-radius: 3px;
+  background: repeating-conic-gradient(#2a2c30 0 25%, #1c1d20 0 50%) 0 0 / 12px 12px; }
+.NodeBody { padding: 4px 0 6px; display: flex; flex-direction: column; gap: 2px; }
+.NodePort { position: relative; display: flex; align-items: center; gap: 6px; padding: 1px 10px; color: var(--Muted); font-size: 11px; }
+.NodePort.Out { justify-content: flex-end; }
+.NodePort i { position: absolute; top: 50%; width: 10px; height: 10px; margin-top: -5px; border-radius: 50%; background: #c9c46a; border: 2px solid #141518; cursor: crosshair; }
+.NodePort.In i { left: -6px; background: #7fb2e5; }
+.NodePort.Out i { right: -6px; }
+.NodeRow { margin: 0 8px; }
+.NodeRow input:not([type=checkbox]), .NodeRow select { width: 100%; min-width: 0; font-size: 11px; padding: 2px 4px; background: var(--Field); border: 1px solid var(--Line); border-radius: 3px; color: var(--Text); }
+.ScriptRow { display: grid; grid-template-columns: minmax(52px, 46%) minmax(0, 1fr); align-items: center; gap: 4px; font-size: 11px; }
+.ScriptRow.Edited input, .MaterialParam.Edited input, .MaterialParam.Edited select { border-color: var(--Accent); }
+.ScriptProp { font: 10px var(--FontMono); color: var(--Muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ScriptRow.Out .ScriptProp { color: #c9c46a; }
+.ScriptRow.In .ScriptProp { color: #7fb2e5; }
+.ScriptFixed { font-size: 10.5px; color: var(--Muted); }
+.ScriptMore { background: none; border: 0; color: var(--Muted); font-size: 11px; text-align: left; padding: 1px 0; cursor: pointer; }
+.ScriptMore:hover { color: var(--Text); }
+.MaterialMain { display: grid; grid-template-rows: minmax(160px, 36%) minmax(0, 1fr); }
+.MaterialPreview { position: relative; border-bottom: 1px solid var(--Line); min-height: 0; }
+.MaterialPreview canvas { display: block; width: 100%; height: 100%; }
+.MaterialPreview .StageEmpty { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; }
+.MaterialPreview .StageEmpty[hidden] { display: none; }
+.MaterialParam { display: grid; grid-template-columns: 1fr 112px; align-items: center; gap: 6px; font-size: 11px; }
+.MaterialParamName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.MaterialParamName.Unknown { color: var(--Muted); }
+.MaterialParam input[type=color] { height: 20px; padding: 0 2px; }
+.MaterialSummary { font-size: 11px; color: var(--Muted); }
+.Button.Primary:not(:disabled) { background: var(--Accent); color: var(--AccentText); border-color: var(--Accent); }
+.Button:disabled { opacity: 0.5; cursor: default; }
+/* ---- strings ---- */
+.StringsPane { grid-template-columns: minmax(0, 1fr); }
+.StringsMain { display: flex; flex-direction: column; min-height: 0; background: var(--Surface); border: 1px solid var(--Line); border-radius: 6px; overflow: hidden; }
+.StringsToolbar { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--Line); flex-wrap: wrap; }
+.StringsToolbar .BlockLabel { margin: 0; }
+.StringsToolbar select { width: auto; max-width: 280px; }
+.StringsToolbar input[type=search] { width: 240px; }
+.StringsTable { flex: 1; overflow: auto; padding: 6px 10px; display: flex; flex-direction: column; gap: 3px; }
+.StringRow { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 8px; align-items: start; }
+.StringRef { font: 11px var(--FontMono); color: var(--Muted); padding-top: 5px; }
+.StringRow textarea { width: 100%; resize: vertical; font: 13px var(--FontUI); background: var(--Field); color: var(--Text); border: 1px solid var(--Line); border-radius: 4px; padding: 3px 6px; }
+.StringRow.Edited textarea { border-color: var(--Accent); }
+@media (max-width: 1100px) { .GraphPane { grid-template-columns: minmax(0, 1fr); } .GraphMain { min-height: 70vh; } }
+
+/* PT: edição STOMP / EN: STOMP editing */
+.StompEditBar { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-top: 1px solid var(--Line); border-bottom: 1px solid var(--Line); background: var(--Surface); flex-wrap: wrap; }
+.StompEditBar[hidden] { display: none; }
+.StompEditBar select { max-width: 170px; }
+.StompEditBar .Sep { width: 1px; align-self: stretch; background: var(--Line); margin: 0 4px; }
+.StompEditBar .StompDirty { margin-left: auto; font-size: 12px; color: var(--Accent); }
+.ToolButton.Primary:not(:disabled) { background: var(--Accent); color: var(--AccentText); border-color: var(--Accent); }
+.DopeLane i { touch-action: none; }
+.StompForm { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 8px; align-items: center; font-size: 12px; margin: 6px 0; }
+.StompForm > span { color: var(--Muted); }
+.StompForm > b { font-weight: 500; font-family: var(--FontMono); text-align: right; overflow-wrap: anywhere; }
+.StompCells { display: flex; gap: 4px; min-width: 0; }
+.StompCells .StompInput { flex: 1 1 0; min-width: 0; }
+.StompInput { width: 100%; min-width: 0; box-sizing: border-box; font: 12px var(--FontMono); }
+.StompRaw summary { cursor: pointer; font-size: 12px; color: var(--Muted); margin-top: 4px; }
+.StompMain .StompPreview { grid-row: 1; } .StompMain .StompTransport { grid-row: 2; } .StompMain .StompEditBar { grid-row: 3; } .StompMain .DopeSheet { grid-row: 4; }
+.PropHeader .PropScriptButton { margin-top: 6px; font: 12px var(--FontUI); }
+.PropFilter select { flex: 1; min-width: 0; }
+
+/* PT: grupos que abrem/fecham e seções Modelo/Materiais (estilo Unreal) / EN: collapsible groups, model/material sections */
+details.PropGroup { margin-top: 8px; }
+details.PropGroup > summary.PropGroupTitle { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; user-select: none; }
+details.PropGroup > summary.PropGroupTitle::-webkit-details-marker { display: none; }
+details.PropGroup > summary.PropGroupTitle::before { content: '▸'; display: inline-block; width: 10px; transition: transform 0.12s; color: var(--Muted); }
+details.PropGroup[open] > summary.PropGroupTitle::before { transform: rotate(90deg); }
+.AssetRowEdit { display: flex; gap: 8px; align-items: flex-start; padding: 6px; border-radius: 4px; background: #00000022; margin: 4px 0; }
+.AssetRowEdit.Edited { outline: 1px solid var(--Accent); }
+.AssetThumb { width: 48px; height: 48px; flex: none; border-radius: 3px; background: #0006 center / cover; object-fit: contain; border: 1px solid var(--Line); }
+.AssetThumb.Large { width: 72px; height: 72px; }
+.AssetThumb.Missing { opacity: 0.3; }
+.AssetRowColumn { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.AssetRowColumn small { color: var(--Muted); font: 11px var(--FontMono); overflow-wrap: anywhere; }
+.AssetField { text-align: left; font: 12px var(--FontMono); padding: 4px 6px; background: var(--Surface); color: var(--Text); border: 1px solid var(--Line); border-radius: 3px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.AssetField:hover { border-color: var(--Accent); }
+.AssetButtons { display: flex; gap: 4px; align-items: center; }
+.AssetButtons .AssetSlot { flex: 1; font-size: 11px; color: var(--Muted); }
+.AssetButtons .ToolButton { padding: 2px 8px; }
+.AssetPicker { position: fixed; z-index: 1000; width: 330px; max-height: 410px; display: flex; flex-direction: column; gap: 6px; padding: 8px; background: var(--Panel, #1c1e22); border: 1px solid var(--Line); border-radius: 6px; box-shadow: 0 8px 28px #000a; }
+.AssetPicker select, .AssetPicker input { width: 100%; box-sizing: border-box; }
+.AssetPickerCount { font: 11px var(--FontMono); color: var(--Muted); }
+.AssetPickerList { overflow-y: auto; flex: 1; min-height: 120px; display: flex; flex-direction: column; gap: 2px; }
+.AssetPickerRow { display: flex; gap: 8px; align-items: center; text-align: left; padding: 4px; border: 1px solid transparent; border-radius: 4px; background: none; color: inherit; cursor: pointer; }
+.AssetPickerRow:hover, .AssetPickerRow:focus-visible { border-color: var(--Line); background: #ffffff08; }
+.AssetPickerRow.Current { border-color: var(--Accent); }
+.AssetPickerThumb { width: 40px; height: 40px; flex: none; border-radius: 3px; background: #0006; object-fit: contain; }
+.AssetPickerText { display: flex; flex-direction: column; min-width: 0; }
+.AssetPickerText b { font: 600 12px var(--FontMono); }
+.AssetPickerText small { font-size: 11px; color: var(--Muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.PropSounds { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.PropSoundButton { font: 11px var(--FontMono); }
+.PropSoundButton.On, .PropScriptButton.On { border-color: var(--Accent); color: var(--Accent); }
+.ScriptPlay { color: var(--Accent); }
+
+/* PT: títulos/flashes da TTB por cima do visor / EN: TTB on-screen overlay */
+.ScreenOverlay { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; }

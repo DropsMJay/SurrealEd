@@ -41,8 +41,8 @@ SkyFields = [
     (3, 'EnvFogStart', True),
     (4, 'EnvFogColour', True),
     (5, 'EnvSkyColour', False),
-    (6, 'EnvSkyP6', False),
-    (7, 'EnvSkyP7', False),
+    (6, 'EnvSkyP6', True),
+    (7, 'EnvSkyP7', True),
     (8, 'EnvSkyP8', False),
     (9, 'EnvSkyRef', False),
 ]

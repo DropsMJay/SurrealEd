@@ -34,7 +34,9 @@ class RiotCameraControls {
     this.Keys = {};
     this.Dragged = 0;
     this.OnSpeedChange = null;
-    this.IsBlocked = () => false;   // PT: o gizmo bloqueia a câmera enquanto arrasta / EN: the gizmo blocks the camera while dragging
+    this.IsBlocked = () => false;
+    this.LockRotation = false;     // PT: menu View → travar rotação / EN: View menu → lock rotation
+    this.OnRotate = null;          // PT: avisado quando o usuário gira a vista / EN: called when the user turns the view   // PT: o gizmo bloqueia a câmera enquanto arrasta / EN: the gizmo blocks the camera while dragging
     this.Camera.rotation.order = 'YXZ';
     this.Bind();
   }
@@ -57,9 +59,33 @@ class RiotCameraControls {
     this.ApplyRotation();
   }
 
-  ApplyRotation() {
-    this.Pitch = THREE.MathUtils.clamp(this.Pitch, -Math.PI / 2 + 0.01, Math.PI / 2 - 0.01);
+  ApplyRotation(Exact) {
+    const Limit = Exact ? Math.PI / 2 : Math.PI / 2 - 0.01;
+    this.Pitch = THREE.MathUtils.clamp(this.Pitch, -Limit, Limit);
     this.Camera.rotation.set(this.Pitch, this.Yaw, 0, 'YXZ');
+  }
+
+  /** PT: Gira a vista pelo usuário (respeita a trava). EN: User rotation (honours the lock). */
+  Turn(DeltaYaw, DeltaPitch) {
+    if (this.LockRotation) return false;
+    this.Yaw += DeltaYaw;
+    this.Pitch += DeltaPitch;
+    this.ApplyRotation();
+    if (this.OnRotate) this.OnRotate();
+    return true;
+  }
+
+  /**
+   * PT: Vista de eixo (Top/Bottom/Front/Rear/Left/Right), mantendo o ponto focado e a distância.
+   * EN: Axis view, keeping the focus point and distance.
+   */
+  SetAxisView(Name) {
+    const Angles = { Top: [0, -Math.PI / 2], Bottom: [0, Math.PI / 2], Front: [0, 0], Rear: [Math.PI, 0], Right: [Math.PI / 2, 0], Left: [-Math.PI / 2, 0] }[Name];
+    if (!Angles) return;
+    const Pivot = this.Pivot();
+    [this.Yaw, this.Pitch] = Angles;
+    this.ApplyRotation(true);
+    this.Camera.position.copy(Pivot).addScaledVector(this.Forward(), -this.FocusDistance);
   }
 
   Bind() {
@@ -94,6 +120,13 @@ class RiotCameraControls {
         if (this.OnSpeedChange) this.OnSpeedChange(this.SpeedIndex + 1, this.Speed);
         return;
       }
+      if (this.Viewport && this.Viewport.Orthographic) {
+        // PT: na ortográfica a roda aproxima (muda o tamanho da vista) em volta do foco / EN: ortho: wheel zooms the view size
+        const Pivot = this.Pivot();
+        this.FocusDistance = THREE.MathUtils.clamp(this.FocusDistance * Math.pow(1.15, Steps), 0.3, 5000);
+        this.Camera.position.copy(Pivot).addScaledVector(this.Forward(), -this.FocusDistance);
+        return;
+      }
       const Distance = -Steps * Math.max(this.Speed * 0.25, 0.5);
       this.Camera.position.addScaledVector(this.Forward(), Distance);
       this.FocusDistance = Math.max(this.FocusDistance - Distance, 0.5);
@@ -121,10 +154,7 @@ class RiotCameraControls {
     const RightVector = new THREE.Vector3(1, 0, 0).applyEuler(Camera.rotation);
     if (Alt && Left && !Right) {                                    // orbitar / orbit
       const Pivot = this.Pivot();
-      this.Yaw -= Dx * Look;
-      this.Pitch -= Dy * Look;
-      this.ApplyRotation();
-      Camera.position.copy(Pivot).addScaledVector(this.Forward(), -this.FocusDistance);
+      if (this.Turn(-Dx * Look, -Dy * Look)) Camera.position.copy(Pivot).addScaledVector(this.Forward(), -this.FocusDistance);
     } else if (Alt && Right && !Left) {                             // aproximar / dolly
       const Pivot = this.Pivot();
       this.FocusDistance = Math.max(this.FocusDistance * Math.exp((Dy - Dx) * 0.01), 0.3);
@@ -133,12 +163,9 @@ class RiotCameraControls {
       Camera.position.addScaledVector(RightVector, Dx * Move);
       Camera.position.y -= Dy * Move;
     } else if (Right) {                                            // olhar / look
-      this.Yaw -= Dx * Look;
-      this.Pitch -= Dy * Look;
-      this.ApplyRotation();
+      this.Turn(-Dx * Look, -Dy * Look);
     } else if (Left) {                                             // girar + andar no plano / yaw + move on ground
-      this.Yaw -= Dx * Look;
-      this.ApplyRotation();
+      this.Turn(-Dx * Look, 0);
       const Ground = this.Forward();
       Ground.y = 0;
       if (Ground.lengthSq() > 1e-6) Camera.position.addScaledVector(Ground.normalize(), -Dy * Move);

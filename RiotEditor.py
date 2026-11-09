@@ -63,6 +63,7 @@ def Main():
     Server, Session, Port = StartServer(GameRoot, os.path.join(Here, 'Editor'), Arguments.port)
     Url = 'http://127.0.0.1:%d/' % Port
     print('%s · %d fases / levels · %d pacotes / packages' % (Session.Game.Title, len(Session.LevelList), len(Session.Game.Packages)))
+    print('Classes: %d (%s)' % (len(Session.Classes.Classes), os.path.basename(Session.Game.Rfl) if Session.Game.Rfl else 'sem .rfl / no .rfl'))
     print('Editor em / at', Url, ' (feche esta janela para sair / close this window to quit)')
     if not Arguments.no_browser:
         threading.Timer(0.8, lambda: webbrowser.open(Url)).start()

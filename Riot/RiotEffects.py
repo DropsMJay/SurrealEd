@@ -268,6 +268,29 @@ class RiotEffectBuilder:
             Effects.append(_Round(Effect))
         return Effects
 
+    # ------------------------------------------------------------------ TS1 Fire
+    def Fires(self, Instances, NumberOf):
+        """
+        PT: Fire (0x1D84210F, TS1), lido em FUN_6DBAC6E0 (vtable +6, atualização): p1 ≠ 0 vira o modelo para a câmera
+            (FUN_6DB0D070: eixo Z local na direção câmera→objeto; p1 = 1 zera a altura = só gira em volta do eixo
+            vertical); a escala de cada eixo anda de p3..p5 até o alvo (p6..p8 ao acender, dedução) × escala da
+            instância. p0: aceso no início (dedução: todo Fire com p0 = 0 começa em 0,001 e só aparece ao receber a
+            entrada p19). Notas seção 9z7.
+        EN: TS1 Fire: p1 billboard mode, p3..p5 start scale, p6..p8 lit scale (inferred), p0 lit at start (inferred).
+        """
+        if self.Game.IsTTB:
+            return []
+        Result = []
+        for Instance in Instances:
+            Template = self.Templates.Get(Instance['TemplatePackage'], Instance['TemplateIndex'])
+            if not Template or self.Classes.Name(Template.ClassId) != 'Fire' or Instance['Id'] not in NumberOf:
+                continue
+            Values = InstanceProperties(Template, Instance)
+            Lit = [_Float(Values.get(Index, 0), 1.0) for Index in (6, 7, 8)]
+            Result.append({'N': NumberOf[Instance['Id']], 'Id': Instance['Id'], 'On': 1 if Values.get(0, 1) else 0,
+                           'Face': Values.get(1, 0) & 0xFF, 'Scale': [round(Value, 4) for Value in Lit]})
+        return Result
+
     # ------------------------------------------------------------------ TS1 Object Generator
     def _Generator(self, Template, Instance, Gravity, TextureRefs):
         V = InstanceProperties(Template, Instance)

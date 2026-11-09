@@ -61,7 +61,10 @@ class RiotGame:
             self.Game, self.Exe = GameTS1, os.path.join(self.Root, Names['suffering.exe'])
         else:
             raise FileNotFoundError('Suffering.exe / SufferingTTB.exe not found in ' + self.Root)
-        Rfl = [Name for Lower, Name in Names.items() if Lower.endswith('.rfl')]
+        # PT: o .rfl com o mesmo nome do .exe primeiro (uma pasta pode ter cópias/backup de outros .rfl)
+        # EN: the .rfl named after the .exe first (a folder may hold copies/backups of other .rfl files)
+        Stem = os.path.splitext(os.path.basename(self.Exe))[0].lower()
+        Rfl = sorted((Name for Lower, Name in Names.items() if Lower.endswith('.rfl')), key=lambda Name: Name.lower() != Stem + '.rfl')
         self.Rfl = os.path.join(self.Root, Rfl[0]) if Rfl else None
         self.Title = GameTitles[self.Game]
         self.IsTTB = self.Game == GameTTB

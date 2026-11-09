@@ -26,6 +26,8 @@ pointer, PropertyCount, GroupCount, group list pointer; each group -> {count, po
 Property *names* are not stored anywhere.
 """
 import re
+import json
+import os
 import struct
 
 
@@ -111,7 +113,13 @@ def ReadRflClasses(Path):
             for Offset in Pointers.get(Address, ()):
                 try:
                     ClassId, _X, _Flags, _NamePointer, PropertyCount, GroupCount, GroupPointer = struct.unpack_from('<7I', Data, Offset - 12)
-                    if ClassId < 0x10000 or not (0 < GroupCount <= 64) or PropertyCount > 2000:
+                    # PT: classes sem propriedades (ex.: Flying Sound Waypoint, Material Type) têm 0 grupos e ponteiro nulo
+                    # EN: property-less classes have 0 groups and a null group pointer
+                    #     (só aceitas com um ponteiro antes do id, como as entradas reais; bytes de código soltos têm ali
+                    #     um número pequeno) / EN: only with a pointer before the id, like real entries
+                    Empty = (GroupCount == 0 and PropertyCount == 0 and GroupPointer == 0
+                             and Offset >= 16 and struct.unpack_from('<I', Data, Offset - 16)[0] >= 0x10000)
+                    if ClassId < 0x10000 or not (Empty or 0 < GroupCount <= 64) or PropertyCount > 2000:
                         continue
                     Types = []
                     for Group in range(GroupCount):
@@ -158,6 +166,15 @@ def ReadEngineClasses(ExePath):
 KnownUnnamed = {0x10D88BF0: 'Godray / alpha', 0x029E9104: 'Water volume', 0x1589A3E3: 'CCTV camera'}
 
 
+# PT: nomes e tipos achados na passada do Ghidra (Ghidra/Atlas), usados quando a leitura do .rfl/.exe não acha a classe
+# EN: names and types from the Ghidra pass, used when the .rfl/.exe reader misses a class
+try:
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'RiotClassNames.json'), encoding='utf-8') as _Handle:
+        FallbackClasses = {Game: {int(Id, 16): Entry for Id, Entry in Table.items()} for Game, Table in json.load(_Handle).items()}
+except (OSError, ValueError):
+    FallbackClasses = {}
+
+
 class RiotClassTable:
     """PT: Todas as classes do jogo (rfl + motor). EN: Every class of the game (rfl + engine)."""
 
@@ -168,7 +185,11 @@ class RiotClassTable:
         except (OSError, struct.error, ValueError):
             pass
         if Game.Rfl:
-            self.Classes.update(ReadRflClasses(Game.Rfl))
+            try:
+                self.Classes.update(ReadRflClasses(Game.Rfl))
+            except (OSError, struct.error, ValueError):
+                pass
+        self.Fallback = FallbackClasses.get('TTB' if Game.IsTTB else 'TS1', {})
 
     def Get(self, ClassId):
         return self.Classes.get(ClassId)
@@ -178,8 +199,13 @@ class RiotClassTable:
         Found = self.Classes.get(ClassId)
         if Found:
             return Found.Name
+        if ClassId in self.Fallback:
+            return self.Fallback[ClassId]['Name']
         return KnownUnnamed.get(ClassId, '?0x%08X' % ClassId)
 
     def PropertyTypes(self, ClassId):
         Found = self.Classes.get(ClassId)
-        return Found.PropertyTypes if Found else None
+        if Found:
+            return Found.PropertyTypes
+        Entry = self.Fallback.get(ClassId)
+        return list(Entry['Types']) if Entry and Entry['Types'] else None

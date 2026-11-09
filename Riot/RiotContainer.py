@@ -263,6 +263,28 @@ def SaveContainerFile(Path, Data, GameRoot):
     return Backup
 
 
+def RebuildFromOriginal(Path, GameRoot, Current, Replace):
+    """
+    PT: Monta o novo arquivo a partir do ORIGINAL (backup, se existir): só os pedaços cujo conteúdo final difere do
+        original são trocados. Assim, desfazer todas as mudanças devolve o arquivo idêntico byte a byte ao original
+        (sem as folgas de alinhamento que gravações intermediárias deixariam). Sem backup, o atual é o original.
+          Current  RiotContainer do arquivo atual;  Replace  {RiotChunk do atual: bytes novos}
+    EN: Builds the new file from the ORIGINAL (backup when present): only chunks whose final content differs from the
+        original are replaced, so undoing every change gives the original back byte for byte.
+    """
+    Backup = BackupPath(Path, GameRoot)
+    if not os.path.exists(Backup):
+        return RebuildContainer(Current, Replace=Replace)
+    Original = RiotContainer(Backup)
+    Final = {(Chunk.ChunkType, Chunk.ChunkId): (Replace[Chunk] if Chunk in Replace else Current.ChunkData(Chunk)) for Chunk in Current.Chunks}
+    Keys = [(Chunk.ChunkType, Chunk.ChunkId) for Chunk in Original.Chunks]
+    if sorted(Keys) != sorted(Final) or len(set(Keys)) != len(Keys):
+        return RebuildContainer(Current, Replace=Replace)     # PT: estrutura mudou / EN: structure changed
+    Changed = {Chunk: Final[(Chunk.ChunkType, Chunk.ChunkId)] for Chunk in Original.Chunks
+               if bytes(Original.ChunkData(Chunk)) != bytes(Final[(Chunk.ChunkType, Chunk.ChunkId)])}
+    return RebuildContainer(Original, Replace=Changed)
+
+
 def BackupPath(Path, GameRoot):
     """PT: Onde fica o original de um arquivo. EN: Where a file's original is kept."""
     return os.path.join(GameRoot, 'SurrealEd Backup', os.path.relpath(os.path.abspath(Path), os.path.abspath(GameRoot)))

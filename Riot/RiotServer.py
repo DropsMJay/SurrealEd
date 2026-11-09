@@ -14,6 +14,13 @@ Endereços:
     /api/LevelGeometry/<Key>       bloco binário com a geometria e as cores pré-calculadas
     /api/LevelTextures/<Key>       texturas da fase, comprimidas como no jogo (DXT1/DXT5/paleta)
     /api/LevelCells/<Key>          salas, células, portais e PVS
+    /api/Materials/<Pkg>           materiais de um pacote (aba Material)
+    /api/Material/<Pkg>/<Idx>      um material: slots, texturas, quadros, camadas, curva
+    /api/StringPackages            pacotes com .xdu (textos)
+    /api/Strings/<Pkg>             textos de um .xdu
+    /api/LevelScript/<Key>         objetos ligados da fase (saídas, entradas, ligações) para a aba Scripting
+    /api/LevelScriptNode/<Key>/<Id> um objeto sozinho (sem ligações) para a aba Scripting
+    /api/LevelSequences/<Key>      sequências STOMP da fase (os .qdu da mesma pasta cujos objetos são dela)
     /api/Instance/<Key>/<Id>       flags e propriedades de uma instância (painel de propriedades)
     /api/Packages                  pacotes com contagem de texturas, modelos e animações
     /api/Textures/<P>, /api/Texture/<P>/<I>             lista de texturas / uma textura (bloco PackTextures)
@@ -22,6 +29,8 @@ Endereços:
     /api/ModelAnimations/<P>/<I>                         animações usadas por um modelo (todos os pacotes)
     /api/Sounds/<P>, /api/SoundInfo/<P>/<I>, /api/Sound/<P>/<I> (WAV)       sons
     /api/Sequences/<P>, /api/Sequence/<P>/<I>                              sequências STOMP (.qdu)
+    /api/SequenceRaw/<P>/<I>       sequência STOMP em forma editável (valores crus de cada evento)
+    POST /api/PreviewSequence/<P>/<I>, /api/SaveSequence/<P>/<I>, /api/RestoreSequence/<P>/<I>   editar STOMP
     /api/Videos/<P>, /api/VideoWmv/<P>/<I>, /api/VideoMp4/<P>/<I>         vídeos (MP4 só com ffmpeg)
     /api/LevelEnvironment/<Key>    ambiente da fase: Level Properties, Sky Properties (neblina), switchers, névoa volumétrica
 Nada é gravado nos arquivos do jogo por este módulo.
@@ -36,6 +45,7 @@ import json
 import mimetypes
 import os
 import socketserver
+import struct
 import threading
 import traceback
 import urllib.parse
@@ -44,16 +54,18 @@ import zlib
 from .RiotAssets import RiotAssetBrowser
 from .RiotClasses import RiotClassTable
 from .RiotEnvironment import RiotEnvironment
+from .RiotMaterialCatalog import MaterialClasses as MaterialClassIds, RiotMaterialCatalog
 from .RiotMaterials import RiotMaterialResolver
-from .RiotModels import RiotModelStore
-from .RiotContainer import BackupPath, RebuildContainer, RestoreOriginal, RiotContainer, SaveContainerFile
+from .RiotLighting import RiotBakedLight
+from .RiotModels import ModelBounds, RiotModelStore, SetModelMaterial
+from .RiotContainer import BackupPath, RebuildContainer, RebuildFromOriginal, RestoreOriginal, RiotContainer, SaveContainerFile
 import copy
 from .RiotLevel import InstanceProperties, ReadInstances, ReadPortals, RiotLevel, SetInstanceProperty, WriteInstances
 from .RiotLevelEdit import RiotCellTree, RiotHistory
-from .RiotMedia import ParseSequence
+from .RiotMedia import ParseSequence, WriteSequence
 from .RiotMedia import RiotMedia
 from .RiotPackages import RiotGame
-from .RiotProperties import DescribeInstance, MessageName, MessageNames, MessageSlots
+from .RiotProperties import DescribeInstance, MessageName, MessageNames, MessageSlots, SlotLabel
 
 
 def MessageNamesFor(IsTTB):
@@ -81,6 +93,7 @@ class RiotSession:
         self.Models = RiotModelStore(self.Game)
         self.Textures = RiotTextureStore(self.Game)
         self.Materials = RiotMaterialResolver(self.Game, self.Templates, self.Textures)
+        self.MaterialCatalog = RiotMaterialCatalog(self.Game, self.Templates, self.Textures, self.Materials)
         self.Builder = RiotSceneBuilder(self.Game, self.Classes, self.Templates, self.Models, self.Textures, self.Materials)
         self.LevelList = self.Game.Levels()
         self.Environment = RiotEnvironment(self.Game, self.Classes, self.Templates)
@@ -126,7 +139,151 @@ class RiotSession:
             ModelRef = Instance['OwnModel']['ModelRef']
         Details = DescribeInstance(Instance, Template, ClassName, Types, self.Game.IsTTB, self.Game.PositionScale, ModelRef)
         Details.update(self.LinkInfo(Level, Instance))
+        Details['ModelInfo'] = self.ModelInfo(ModelRef, Template.ModelRef if Template else 0, bool(Instance['OwnModel'] and Instance['OwnModel']['ModelRef']))
+        Details['Sounds'] = self.InstanceSounds(Details['Properties'])
         return Details
+
+    def InstanceSounds(self, Properties):
+        """PT: Sons (.sdu) citados nas propriedades — para o botão tocar. EN: Playable sounds referenced by the properties."""
+        Sounds = []
+        for Row in Properties:
+            for Ref in Row.get('Refs') or []:
+                Info = self.Media.SoundInfo(Ref >> 16, Ref & 0xFFFF) if (Ref >> 16) in self.Game.Packages else None
+                if Info and Info.get('Rate') and Info.get('Bytes'):
+                    Sounds.append({'Slot': Row['Index'], 'Ref': Info['Ref'], 'Duration': Info['Duration'], 'Loop': Info['Loop'],
+                                   'Volume': Info.get('Volume'), 'Text': Info.get('Text')})
+        return Sounds
+
+    def ModelInfo(self, ModelRef, TemplateRef, Own):
+        """PT: Modelo do objeto e materiais dele (painel Details). EN: The object's model and its materials."""
+        Name = lambda Ref: '%d_%04x' % (Ref >> 16, Ref & 0xFFFF) if Ref else None
+        Model = self.Models.Get(ModelRef >> 16, ModelRef & 0xFFFF) if ModelRef else None
+        Materials = []
+        for Slot, Ref in enumerate(Model.Materials if Model else []):
+            Texture = self.Materials.Texture(Ref >> 16, Ref & 0xFFFF) if Ref else None
+            Materials.append({'Slot': Slot, 'Ref': Name(Ref), 'Texture': '%d_%04x' % Texture if Texture else None,
+                              'Blend': self.Materials.Blend(Ref >> 16, Ref & 0xFFFF) if Ref else None})
+        return {'Model': Name(ModelRef), 'Template': Name(TemplateRef), 'Own': Own, 'Materials': Materials,
+                'Users': None}
+
+    def _ApplyModel(self, Instance, Ref, Original):
+        """
+        PT: Troca o modelo de uma instância (bloco "modelo próprio", flag 0x8000): referência + esfera/caixa que o modelo
+            declara (RiotModels.ModelBounds). A luz pré-calculada (.ldu, uma cor por vértice do modelo) só fica se for
+            do modelo novo; senão a instância fica sem .ldu (estado que já existe no jogo). Voltar ao modelo original
+            devolve flag, bloco e .ldu do backup, então o .lvl volta idêntico.
+        EN: Changes an instance's model (own-model block, flag 0x8000) with the model's declared bounds; baked light is
+            dropped unless it belongs to the new model; going back to the original model restores it byte for byte.
+        """
+        Template = self.Templates.Get(Instance['TemplatePackage'], Instance['TemplateIndex'])
+        Effective = lambda Item: (Item['OwnModel']['ModelRef'] if Item.get('OwnModel') and Item['OwnModel']['ModelRef'] else (Template.ModelRef if Template else 0))
+        if Original is not None and Ref == Effective(Original):
+            Instance['Flags'] = (Instance['Flags'] & ~0x8000) | (Original['Flags'] & 0x8000)
+            Instance['OwnModel'] = copy.deepcopy(Original['OwnModel'])
+            Instance['Tail'] = Original['Tail']
+            return
+        if Ref == Effective(Instance):
+            return
+        Container = self.Game.PackageContainer(Ref >> 16, '.mdu')
+        Bounds = ModelBounds(Container, Ref & 0xFFFF) if Container else None
+        if not Bounds:
+            raise ValueError('model %d_%04x not found or without bounds / modelo sem limites' % (Ref >> 16, Ref & 0xFFFF))
+        Instance['Flags'] |= 0x8000
+        Instance['OwnModel'] = {'ModelRef': Ref, 'Sphere': Bounds[:4], 'Matrix': Bounds[4:]}
+        Baked = RiotBakedLight(self.Game).Colors(Instance['Tail']) if Instance['Tail'] else None
+        if not Baked or Baked[0] != Ref:
+            Instance['Tail'] = 0
+
+    def SetModelMaterial(self, Package, Index, Slot, MaterialRef):
+        """
+        PT: Troca o material Slot de um modelo (.mdu, pedaço 0x0200; vale para todo objeto que usa esse modelo).
+            Refeito a partir do original: voltar o material devolve o arquivo idêntico.
+        EN: Swaps one material of a model (0x0200; affects every object using the model). Rebuilt from the original.
+        """
+        Path = self.Game.PackagePath(Package, '.mdu')
+        if not Path:
+            return {'Error': 'unknown package / pacote desconhecido'}
+        with self.Lock:
+            Container = RiotContainer(Path)
+            Chunk = Container.Resource(Index).get(0x0200)
+            if not Chunk:
+                return {'Error': 'unknown model / modelo desconhecido'}
+            Target = self.Templates.Get(MaterialRef >> 16, MaterialRef & 0xFFFF)
+            if not Target or Target.ClassId not in MaterialClassIds:
+                return {'Error': 'not a material / não é um material'}
+            try:
+                New = SetModelMaterial(Container.Data, Chunk.Offset, Chunk.Size, int(Slot), MaterialRef)
+            except ValueError as Error:
+                return {'Error': str(Error)}
+            if New == Container.ChunkData(Chunk):
+                return {'Saved': 0}
+            Backup = SaveContainerFile(Path, RebuildFromOriginal(Path, self.Game.Root, Container, {Chunk: New}), self.Game.Root)
+            self.Game.ForgetContainer(Path)
+            self.Models._Cache.pop((Package, Index), None)
+            self.Assets._ModelCache.pop((Package, Index), None)
+            self.Cache.clear()
+            self.CacheOrder.clear()
+        return {'Saved': 1, 'Backup': os.path.relpath(Backup, self.Game.Root)}
+
+    def LevelScript(self, Key):
+        """
+        PT: A "programação" da fase como grafo: cada objeto que manda ou recebe ligações vira um nó, com as propriedades
+            de saída (mensagem que ele manda para TODOS os links) e de entrada (mensagem que ele escuta) e as entradas
+            fixas da classe; as ligações (lista Links da instância) são as arestas.
+        EN: The level's logic as a graph: every object that sends or receives links is a node (output/input message
+            properties and the class's fixed inputs); the instance Links lists are the edges.
+        """
+        Level = self.OpenLevel(Key)
+        if not Level:
+            return None
+        IsTTB, Scale = self.Game.IsTTB, self.Game.PositionScale
+        Targets = {Uid for Instance in Level.Instances for Uid in Instance['Links']}
+        Nodes = [self.ScriptNode(Instance) for Instance in Level.Instances if Instance['Links'] or Instance['Id'] in Targets]
+        return {'Key': Key, 'Nodes': Nodes, 'MessageNames': {str(Id): Name for Id, Name in MessageNames.get('TTB' if IsTTB else 'TS1', {}).items()}}
+
+    def ScriptNode(self, Instance):
+        """PT: Um nó do grafo da aba Scripting. EN: One Scripting graph node."""
+        IsTTB, Scale = self.Game.IsTTB, self.Game.PositionScale
+        Template = self.Templates.Get(Instance['TemplatePackage'], Instance['TemplateIndex'])
+        Slots = MessageSlots(Template.ClassId, IsTTB) if Template else MessageSlots(None, IsTTB)
+        Values = InstanceProperties(Template, Instance) if Template else {}
+        ClassId = Template.ClassId if Template else None
+        Port = lambda Index: {'Property': Index, 'Message': Values.get(Index, 0), 'Name': MessageName(Values.get(Index, 0), IsTTB),
+                              'Label': SlotLabel(ClassId, Index, IsTTB)}
+        return {
+            'Id': Instance['Id'], 'Class': self.Classes.Name(Template.ClassId) if Template else '?',
+            'Template': '%d_%04x' % (Instance['TemplatePackage'], Instance['TemplateIndex']),
+            'Position': [round(Value / Scale, 3) for Value in Instance['Position']],
+            'Outputs': [Port(Index) for Index in Slots['outputs']],
+            'Inputs': [Port(Index) for Index in Slots['inputs']],
+            'Fixed': [{'Message': Id, 'Name': MessageName(Id, IsTTB)} for Id in Slots['fixed'] if Id < 0x1000],
+            'Links': list(Instance['Links']),
+            'Sounds': self.NodeSounds(Instance, Template),
+        }
+
+    def NodeSounds(self, Instance, Template):
+        """PT: Sons tocáveis de um Sound Effect (lista p0) para o ▶ do nó. EN: Playable sounds of a Sound Effect (p0 list)."""
+        if not Template or self.Classes.Name(Template.ClassId) != 'Sound Effect':
+            return []
+        from .RiotProperties import _ArrayItems
+        Overridden = dict(zip(Instance['PropertyIndexes'], range(len(Instance['PropertyIndexes']))))
+        if 0 in Overridden:
+            Words, Header = Instance['Values'], Instance['Values'][Overridden[0]]
+        else:
+            Words, Header = Template.Slots, Template.Slot(0)
+        Result = []
+        for Ref in _ArrayItems(Words, Header) if isinstance(Header, int) else []:
+            if isinstance(Ref, int) and (Ref >> 16) in self.Game.Packages:
+                Container = self.Game.PackageContainer(Ref >> 16, '.sdu')
+                if Container and self.Media._SoundHeader(Container, Ref & 0xFFFF):
+                    Result.append('%d_%04x' % (Ref >> 16, Ref & 0xFFFF))
+        return Result
+
+    def LevelScriptNode(self, Key, InstanceId):
+        """PT: Nó de um objeto sem ligações (a aba Scripting o mostra sozinho). EN: Node of an unlinked object."""
+        Level = self.OpenLevel(Key)
+        Instance = next((Item for Item in Level.Instances if Item['Id'] == InstanceId), None) if Level else None
+        return self.ScriptNode(Instance) if Instance else None
 
     def LinkInfo(self, Level, Instance):
         """
@@ -210,6 +367,13 @@ class RiotSession:
             Types = self.Classes.PropertyTypes(Template.ClassId) if Template else None
             for Index, Value in Change['Properties'].items():
                 SetInstanceProperty(Instance, int(Index), int(Value), Types)
+        if 'Links' in Change:
+            # PT: a lista de ligações é gravada inteira (i16 de contagem + u32 por id, RiotLevel.WriteInstances)
+            # EN: the whole link list is written back (i16 count + one u32 per id)
+            Links = [int(Value) & 0xFFFFFFFF for Value in Change['Links']]
+            if len(Links) > 32767:
+                raise ValueError('too many links / ligações demais')
+            Instance['Links'] = Links
         if 'Scale' in Change:
             Values = tuple(float(Value) for Value in Change['Scale'])
             if Instance['Flags'] & 0x100 or any(abs(Value - 1.0) > 1e-6 for Value in Values):
@@ -309,11 +473,19 @@ class RiotSession:
             Replace = {}
             Applied = 0
             try:
+                OriginalById = None
                 for Change in Changes:
                     Instance = ById.get(Change.get('Id'))
                     if not Instance:
                         return {'Error': 'unknown instance %s / instância desconhecida' % Change.get('Id')}
                     self._ApplyChange(Instance, Change)
+                    if Change.get('Model'):
+                        if OriginalById is None:
+                            Backup = BackupPath(Info['Path'], self.Game.Root)
+                            Source = RiotContainer(Backup) if os.path.exists(Backup) else Container
+                            OriginalById = {Item['Id']: Item for Item in ReadInstances(Source)[0]}
+                        Package, _Sep, Index = str(Change['Model']).partition('_')
+                        self._ApplyModel(Instance, (int(Package) << 16) | int(Index, 16), OriginalById.get(Instance['Id']))
                     Applied += 1
                 Tree = History = None
                 if Added or Removed:
@@ -362,7 +534,7 @@ class RiotSession:
             except (ValueError, KeyError, TypeError) as Error:
                 return {'Error': str(Error)}
             Replace[Chunk] = WriteInstances(Instances)
-            Data = RebuildContainer(Container, Replace=Replace)
+            Data = RebuildFromOriginal(Info['Path'], self.Game.Root, Container, Replace)
             Check, _Ok = ReadInstances(RiotContainer(Data=Data))
             if len(Check) != len(Instances):
                 return {'Error': 'verification failed; not saving / a verificação falhou; nada gravado'}
@@ -396,10 +568,91 @@ class RiotSession:
                 New = BuildTextureChunk(Container.ChunkData(Chunk), Width, Height, Format, AlphaBits, Payload, Mips)
             except (KeyError, ValueError) as Error:
                 return {'Error': str(Error)}
-            Data = RebuildContainer(Container, Replace={Chunk: New})
+            Data = RebuildFromOriginal(Path, self.Game.Root, Container, {Chunk: New})
             Backup = SaveContainerFile(Path, Data, self.Game.Root)
             self._AfterAssetWrite(Path)
         return {'Saved': True, 'Bytes': len(New), 'OldBytes': Chunk.Size, 'Backup': os.path.relpath(Backup, self.Game.Root)}
+
+    def SaveStrings(self, Package, Changes):
+        """
+        PT: Troca textos de um .xdu (só os pedaços mudados; o resto do arquivo fica idêntico). Backup na primeira vez.
+        EN: Replaces strings of a .xdu (only the changed chunks; the rest stays identical). Backup on first save.
+        """
+        Path = self.Game.PackagePath(Package, '.xdu')
+        if not Path:
+            return {'Error': 'unknown package / pacote desconhecido'}
+        with self.Lock:
+            Container = RiotContainer(Path)
+            Replace = {}
+            try:
+                for Key, Text in Changes.items():
+                    Chunk = Container.Resource(int(Key)).get(0x0400)
+                    if not Chunk:
+                        return {'Error': 'unknown string %s / texto desconhecido' % Key}
+                    New = self.Media.EncodeString(str(Text), Container.ChunkData(Chunk))
+                    if New != Container.ChunkData(Chunk):
+                        Replace[Chunk] = New
+            except ValueError as Error:
+                return {'Error': str(Error)}
+            if not Replace:
+                return {'Saved': 0}
+            Backup = SaveContainerFile(Path, RebuildFromOriginal(Path, self.Game.Root, Container, Replace), self.Game.Root)
+            self.Game.ForgetContainer(Path)
+            self.Media._Strings.pop(Package, None)
+        return {'Saved': len(Replace), 'Backup': os.path.relpath(Backup, self.Game.Root)}
+
+    def PreviewSequence(self, Package, Index, Raw):
+        """PT: Decodifica uma sequência editada (sem gravar) para o tocador. EN: Decodes an edited sequence (no write)."""
+        with self.Lock:
+            try:
+                Sequence = self.Media.SequenceFromRaw(Package, Index, Raw)
+            except (ValueError, KeyError, TypeError, struct.error) as Error:
+                return {'Error': str(Error)}
+            return self.Media.DescribeSequence(Package, Index, Sequence)
+
+    def SaveSequence(self, Package, Index, Raw):
+        """
+        PT: Grava uma sequência STOMP editada no .qdu (só esse pedaço muda; refeito a partir do original, então desfazer
+            tudo devolve o arquivo idêntico). Backup do original na primeira vez.
+        EN: Writes an edited STOMP sequence into its .qdu (only that chunk changes; rebuilt from the original backup).
+        """
+        Path = self.Game.PackagePath(Package, '.qdu')
+        if not Path:
+            return {'Error': 'unknown package / pacote desconhecido'}
+        with self.Lock:
+            try:
+                Sequence = self.Media.SequenceFromRaw(Package, Index, Raw)
+            except (ValueError, KeyError, TypeError, struct.error) as Error:
+                return {'Error': str(Error)}
+            Container = RiotContainer(Path)
+            Chunk = Container.Resource(Index).get(0x0311)
+            New = WriteSequence(Sequence, self.Game.IsTTB)
+            if New == Container.ChunkData(Chunk):
+                return {'Saved': 0}
+            Backup = SaveContainerFile(Path, RebuildFromOriginal(Path, self.Game.Root, Container, {Chunk: New}), self.Game.Root)
+            self.Game.ForgetContainer(Path)
+        return {'Saved': 1, 'Bytes': len(New), 'Backup': os.path.relpath(Backup, self.Game.Root)}
+
+    def RestoreSequence(self, Package, Index):
+        """PT: Volta a sequência ao conteúdo do backup original. EN: Puts the sequence back as in the original backup."""
+        Path = self.Game.PackagePath(Package, '.qdu')
+        if not Path:
+            return {'Error': 'unknown package / pacote desconhecido'}
+        with self.Lock:
+            Original = BackupPath(Path, self.Game.Root)
+            if not os.path.exists(Original):
+                return {'Saved': 0}
+            Source = RiotContainer(Original).Resource(Index).get(0x0311)
+            Container = RiotContainer(Path)
+            Chunk = Container.Resource(Index).get(0x0311)
+            if not Source or not Chunk:
+                return {'Error': 'unknown sequence / sequência desconhecida'}
+            OriginalData = RiotContainer(Original).ChunkData(Source)
+            if OriginalData == Container.ChunkData(Chunk):
+                return {'Saved': 0}
+            SaveContainerFile(Path, RebuildFromOriginal(Path, self.Game.Root, Container, {Chunk: OriginalData}), self.Game.Root)
+            self.Game.ForgetContainer(Path)
+        return {'Saved': 1}
 
     def SaveTemplate(self, Package, Index, Changes):
         """
@@ -425,7 +678,7 @@ class RiotSession:
                 New = PatchTemplate(Container.ChunkData(Chunk), Parsed)
             except (ValueError, zlib.error) as Error:
                 return {'Error': str(Error)}
-            Backup = SaveContainerFile(Path, RebuildContainer(Container, Replace={Chunk: New}), self.Game.Root)
+            Backup = SaveContainerFile(Path, RebuildFromOriginal(Path, self.Game.Root, Container, {Chunk: New}), self.Game.Root)
             self.Game.ForgetContainer(Path)
             self.Templates._Cache.clear()
             self.Cache.clear()
@@ -564,6 +817,13 @@ def MakeHandler(Session):
         def Post(self, Path, Body):
             """PT: Gravações (só aceitas de localhost). EN: Writes (localhost only)."""
             Name, _Slash, Argument = Path.partition('/')
+            if Name == 'SaveStrings':
+                try:
+                    Package = int(Argument)
+                except ValueError:
+                    return self.SendJson({'Error': 'bad package / pacote inválido'}, 400)
+                Result = Session.SaveStrings(Package, json.loads(Body or b'{}').get('Strings', {}))
+                return self.SendJson(Result, 400 if 'Error' in Result else 200)
             if Name == 'SaveTemplate':
                 Package, _Slash, Index = Argument.partition('/')
                 try:
@@ -583,6 +843,31 @@ def MakeHandler(Session):
                     Result = Session.ImportTexture(Package, Index, Query, Body)
                 else:
                     Result = Session.RestoreTexture(Package, Index)
+            elif Name in ('PreviewSequence', 'SaveSequence'):
+                Package, _Slash, Index = Argument.partition('/')
+                try:
+                    Package, Index = int(Package), int(Index, 0)
+                except ValueError:
+                    return self.SendJson({'Error': 'bad reference / referência inválida'}, 400)
+                Raw = json.loads(Body or b'{}')
+                Result = (Session.PreviewSequence if Name == 'PreviewSequence' else Session.SaveSequence)(Package, Index, Raw)
+            elif Name == 'SetModelMaterial':
+                Package, _Slash, Index = Argument.partition('/')
+                Request = json.loads(Body or b'{}')
+                try:
+                    Package, Index = int(Package), int(Index, 0)
+                    MaterialPackage, _Sep, MaterialIndex = str(Request['Material']).partition('_')
+                    MaterialRef = (int(MaterialPackage) << 16) | int(MaterialIndex, 16)
+                except (ValueError, KeyError):
+                    return self.SendJson({'Error': 'bad reference / referência inválida'}, 400)
+                Result = Session.SetModelMaterial(Package, Index, Request.get('Slot', 0), MaterialRef)
+            elif Name == 'RestoreSequence':
+                Package, _Slash, Index = Argument.partition('/')
+                try:
+                    Package, Index = int(Package), int(Index, 0)
+                except ValueError:
+                    return self.SendJson({'Error': 'bad reference / referência inválida'}, 400)
+                Result = Session.RestoreSequence(Package, Index)
             elif Name == 'SaveLevel':
                 Request = json.loads(Body or b'{}')
                 Result = Session.SaveLevel(Argument, Request.get('Changes', []), Request.get('Added', []), Request.get('Removed', []))
@@ -618,7 +903,48 @@ def MakeHandler(Session):
                 if not Details:
                     return self.SendJson({'Error': 'unknown instance / instância desconhecida'}, 404)
                 return self.SendJson(Details)
-            if Name in ('Sounds', 'SoundInfo', 'Sound', 'Sequences', 'Sequence', 'Videos', 'VideoWmv', 'VideoMp4'):
+            if Name in ('Materials', 'Material'):
+                Parts = Argument.split('/')
+                try:
+                    Package = int(Parts[0])
+                    Index = int(Parts[1], 0) if len(Parts) > 1 else None
+                except ValueError:
+                    return self.SendJson({'Error': 'bad reference / referência inválida'}, 400)
+                with Session.Lock:
+                    Result = Session.MaterialCatalog.MaterialList(Package) if Name == 'Materials' else Session.MaterialCatalog.Material(Package, Index)
+                if Result is None:
+                    return self.SendJson({'Error': 'not a material / não é material'}, 404)
+                return self.SendJson(Result)
+            if Name == 'StringPackages':
+                with Session.Lock:
+                    return self.SendJson(Session.Media.StringPackages())
+            if Name == 'Strings':
+                try:
+                    Package = int(Argument)
+                except ValueError:
+                    return self.SendJson({'Error': 'bad package / pacote inválido'}, 400)
+                with Session.Lock:
+                    Result = Session.Media.StringList(Package)
+                return self.SendJson(Result if Result is not None else {'Error': 'no .xdu / sem .xdu'}, 200 if Result is not None else 404)
+            if Name == 'LevelScriptNode':
+                LevelKey, _Slash, IdText = Argument.rpartition('/')
+                try:
+                    Result = Session.LevelScriptNode(LevelKey, int(IdText))
+                except ValueError:
+                    Result = None
+                return self.SendJson(Result if Result else {'Error': 'unknown instance / instância desconhecida'}, 200 if Result else 404)
+            if Name == 'LevelScript':
+                Result = Session.LevelScript(Argument)     # PT: OpenLevel já trava / EN: OpenLevel takes the lock itself
+                if Result is None:
+                    return self.SendJson({'Error': 'unknown level / fase desconhecida'}, 404)
+                return self.SendJson(Result)
+            if Name == 'LevelSequences':
+                with Session.Lock:
+                    Result = Session.Media.LevelSequences(Argument)
+                if Result is None:
+                    return self.SendJson({'Error': 'unknown level / fase desconhecida'}, 404)
+                return self.SendJson(Result)
+            if Name in ('Sounds', 'SoundInfo', 'Sound', 'Sequences', 'Sequence', 'SequenceRaw', 'Videos', 'VideoWmv', 'VideoMp4'):
                 return self.MediaApi(Name, Argument)
             if Name in ('Packages', 'Textures', 'Texture', 'Models', 'Model', 'ModelGeometry', 'ModelTextures', 'Animations', 'Animation', 'ModelAnimations'):
                 return self.AssetApi(Name, Argument)
@@ -667,6 +993,8 @@ def MakeHandler(Session):
                     Result = Media.SoundInfo(Package, Index)
                 elif Name == 'Sequence':
                     Result = Media.Sequence(Package, Index)
+                elif Name == 'SequenceRaw':
+                    Result = Media.SequenceRaw(Package, Index)
                 elif Name == 'Sound':
                     Body = Media.SoundWav(Package, Index)
                     return self.SendBytes(Body, 'audio/wav') if Body else self.SendJson({'Error': 'unknown sound'}, 404)

@@ -112,3 +112,77 @@ def WorldLights(Instances, Templates, PositionScale):
         Dx, Dy, Dz = math.sin(Yaw) * math.cos(X), -math.sin(X), math.cos(Yaw) * math.cos(X)
         Result['Directional'].append([round(Dx, 5), round(Dy, 5), round(Dz, 5)] + Rgb + [Instance['Id']] + Where)
     return Result
+
+
+ClassLightingEffect = 0x6968CE68
+
+
+def LightEffects(Instances, Templates, Waveforms, IsTTB):
+    """
+    PT: Lighting Effect (0x6968CE68, classe do motor) — anima a cor e o raio das Point Lights ligadas a ele.
+        Lido no Suffering.exe (nota 9z8):
+          • tabela de classes: p0, p1 int; p2–p5 mensagens; p6, p7 cor; p8 curva (.wdu); p9, p10 float + p11 curva;
+            p12, p13 float + p14 curva; p15, p16 float + p17 curva;
+          • 0x4C4C40 (início): p0 ≠ 0 = ativo desde o começo; guarda as Point/Spot Lights dos links;
+          • mapa de mensagens 0x5BA480: p2 liga (0x4C49D0), p3 desliga (0x4C49F0), p4 destrói (0x4C4A20);
+          • a cada quadro (0x4C5820): tempo += dt; para cada curva carregada, t = fmod(tempo, duração),
+            s = (curva(t) + 1) × 0,5; com p1 = 0 a curva para depois de uma volta;
+            cor (0x4C4F20) = p6 + (p7 − p6) × s por canal (/255);
+            raio (0x4C5450) = p9 + (p10 − p9) × s, no mesmo campo e escala do p8 da Point Light (0x4C60B0);
+            p12–p17 só valem para Spot Lights.
+        Também a Point Light com p3 ≠ −1 cria, ao nascer, um objeto do modelo p3 ligado a ela (0x4C6CA0) — é assim que
+        as lâmpadas que piscam funcionam (os modelos são Lighting Effects do World Common).
+        Devolve [{Id, Template, Lights: [ids], On, Loop, Color: [[r,g,b],[r,g,b]] | None, ColorWave, Radius: [a, b] | None,
+        RadiusWave}], com as curvas por referência em Waves (para Scene.Waves). Só TS1 (a TTB não foi conferida).
+    EN: Lighting Effect: animates colour and radius of its linked point lights (see the notes for addresses).
+    """
+    if IsTTB:
+        return [], {}
+    Float = lambda Value: struct.unpack('<f', struct.pack('<I', Value & 0xFFFFFFFF))[0]
+    Rgb = lambda Value: [round(((Value >> Shift) & 255) / 255.0, 4) for Shift in (16, 8, 0)]
+    Waves = {}
+
+    def Wave(Ref):
+        if not Ref or Ref == 0xFFFFFFFF:
+            return None
+        Name = '%d_%04x' % (Ref >> 16, Ref & 0xFFFF)
+        if Name not in Waves:
+            Data = Waveforms.Get(Ref >> 16, Ref & 0xFFFF)
+            if not Data:
+                return None
+            Waves[Name] = [round(Data[0], 5), Data[1], [round(Value, 5) for Value in Data[2]], round(Data[3], 5)]
+        return Name
+
+    def Effect(Values, Id, Template, Lights):
+        ColorWave, RadiusWave = Wave(Values.get(8, 0)), Wave(Values.get(11, 0))
+        if not ColorWave and not RadiusWave:
+            return None
+        return {'Id': Id, 'Template': Template, 'Lights': Lights, 'On': 1 if Values.get(0, 0) else 0, 'Loop': 1 if Values.get(1, 0) else 0,
+                'Color': [Rgb(Values.get(6, 0)), Rgb(Values.get(7, 0))] if ColorWave else None, 'ColorWave': ColorWave,
+                'Radius': [round(Float(Values.get(9, 0)), 4), round(Float(Values.get(10, 0)), 4)] if RadiusWave else None, 'RadiusWave': RadiusWave}
+
+    ClassOf = {}
+    for Instance in Instances:
+        Template = Templates.Get(Instance['TemplatePackage'], Instance['TemplateIndex'])
+        ClassOf[Instance['Id']] = Template.ClassId if Template else None
+    Result = []
+    for Instance in Instances:
+        Template = Templates.Get(Instance['TemplatePackage'], Instance['TemplateIndex'])
+        if not Template or Instance['Flags'] & 8:
+            continue
+        Values = InstanceProperties(Template, Instance)
+        if Template.ClassId == ClassLightingEffect:
+            Lights = [Target for Target in Instance['Links'] if ClassOf.get(Target) == ClassPointLight]
+            Entry = Effect(Values, Instance['Id'], None, Lights) if Lights else None
+        elif Template.ClassId == ClassPointLight and Values.get(3, 0) not in (0, 0xFFFFFFFF):
+            Ref = Values[3]
+            Spawned = Templates.Get(Ref >> 16, Ref & 0xFFFF)
+            Entry = None
+            if Spawned and Spawned.ClassId == ClassLightingEffect:
+                Entry = Effect({Slot: Spawned.Slot(Slot) for Slot in range(len(Spawned.Slots))}, None,
+                               '%d_%04x' % (Ref >> 16, Ref & 0xFFFF), [Instance['Id']])
+        else:
+            continue
+        if Entry:
+            Result.append(Entry)
+    return Result, Waves

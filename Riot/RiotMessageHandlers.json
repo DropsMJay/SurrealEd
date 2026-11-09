@@ -1,0 +1,2202 @@
+{
+"TS1": {
+"0x04AD652D": {
+"Fixed": {
+"104": "0x6dbe4f50"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"136": "0x6dbe1e10",
+"137": "0x6dbe2790",
+"14": "0x6dba1c40",
+"26": "0x6dbe30d0",
+"27": "0x6dbe4ea0"
+},
+"Name": "Hermes",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"168": [
+"0x6db87010"
+],
+"169": [
+"0x6dbe7390"
+],
+"28": [
+"0x6dbe2620",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"30": [
+"0x6db8dda0",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"31": [
+"0x6dbe3ab0"
+],
+"32": [
+"0x6dbe2440"
+],
+"34": [
+"0x6dbe3ab0"
+],
+"35": [
+"0x6dbe72c0"
+]
+}
+},
+"0x04CB8BE8": {
+"Fixed": {},
+"Inputs": {
+"13": "0x6db8be30",
+"14": "0x6db8be90",
+"15": "0x6db8bf10",
+"16": "0x6db8b820"
+},
+"Name": "Projector Effect",
+"OutputSites": {}
+},
+"0x06CE3FE2": {
+"Fixed": {
+"104": "0x6dbe4f50"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"136": "0x6dbe1e10",
+"137": "0x6dbe2790",
+"14": "0x6dba1c40",
+"26": "0x6dbe30d0",
+"27": "0x6dbe4ea0"
+},
+"Name": "Rat",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"168": [
+"0x6db87010"
+],
+"169": [
+"0x6dbe7390"
+],
+"28": [
+"0x6db335e0",
+"0x6dbe2620",
+"0x6dbe2f70"
+],
+"30": [
+"0x6db335e0",
+"0x6db8dda0",
+"0x6dbe2f70"
+],
+"31": [
+"0x6dbe3ab0"
+],
+"32": [
+"0x6dbe2440"
+],
+"34": [
+"0x6dbe3ab0"
+],
+"35": [
+"0x6dbe72c0"
+]
+}
+},
+"0x08A4DE62": {
+"Fixed": {},
+"Inputs": {
+"0": "0x6db970a0"
+},
+"Name": "Autosave",
+"OutputSites": {}
+},
+"0x0E15C87E": {
+"Fixed": {
+"104": "0x6dbe4f50"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"136": "0x6dbe1e10",
+"137": "0x6dbe2790",
+"14": "0x6dba1c40",
+"26": "0x6dbe30d0",
+"27": "0x6dbe4ea0"
+},
+"Name": "Unspeakable NPC",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"168": [
+"0x6db87010"
+],
+"169": [
+"0x6dbe7390"
+],
+"28": [
+"0x6dbe2620",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"30": [
+"0x6db8dda0",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"31": [
+"0x6dbe3ab0"
+],
+"32": [
+"0x6dbe2440"
+],
+"34": [
+"0x6dbe3ab0"
+],
+"35": [
+"0x6dbe72c0"
+]
+}
+},
+"0x0FE41EA4": {
+"Fixed": {
+"4097": "0x6dbbcba0",
+"4098": "0x6dbbcbb0"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"50": "0x6dbbd110",
+"51": "0x6dbbd100",
+"52": "0x6dbbd660"
+},
+"Name": "Key",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"53": [
+"0x6dbbd440"
+],
+"54": [
+"0x6dbbddb0"
+]
+}
+},
+"0x10BD8382": {
+"Fixed": {},
+"Inputs": {
+"10": "0x6dbc2770",
+"11": "0x6dbc2430",
+"12": "0x6dc2eaa0"
+},
+"Name": "Level Transition",
+"OutputSites": {}
+},
+"0x10C956B7": {
+"Fixed": {},
+"Inputs": {
+"3": "0x6dba1980",
+"4": "0x6dba19c0",
+"5": "0x6dba1a00"
+},
+"Name": "Count Down To Zero",
+"OutputSites": {
+"6": [
+"0x6dba18f0",
+"0x6dba1930"
+]
+}
+},
+"0x127243E5": {
+"Fixed": {
+"104": "0x6dbe4f50"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"136": "0x6dbe1e10",
+"137": "0x6dbe2790",
+"14": "0x6dba1c40",
+"26": "0x6dbe30d0",
+"27": "0x6dbe4ea0"
+},
+"Name": "Mainliner",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"168": [
+"0x6db87010"
+],
+"169": [
+"0x6dbe7390"
+],
+"28": [
+"0x6dbe2620",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"30": [
+"0x6db8dda0",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"31": [
+"0x6dbe3ab0"
+],
+"32": [
+"0x6dbe2440"
+],
+"34": [
+"0x6dbe3ab0"
+],
+"35": [
+"0x6dbe72c0"
+]
+}
+},
+"0x1589A3E3": {
+"Fixed": {},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"59": "0x6dbc8e90",
+"60": "0x6dbc8ee0",
+"61": "0x6dbc7a90",
+"62": "0x6dbc9220",
+"63": "0x6dbc8f80",
+"64": "0x6dbc8f30",
+"65": "0x6dbc7ad0",
+"66": "0x6dbc92a0"
+},
+"Name": "Mechanism",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+]
+}
+},
+"0x19B50DBB": {
+"Fixed": {},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40"
+},
+"Name": "TargetableBreakable",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+]
+}
+},
+"0x19E0722B": {
+"Fixed": {},
+"Inputs": {
+"1": "0x6db24ca0"
+},
+"Name": "Map Switcher",
+"OutputSites": {}
+},
+"0x19F64171": {
+"Fixed": {
+"4097": "0x6dbbcba0",
+"4098": "0x6dbbcbb0"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"50": "0x6dbbd110",
+"51": "0x6dbbd100",
+"52": "0x6dbbd660"
+},
+"Name": "Health Bonus Item",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"53": [
+"0x6dbbd440"
+],
+"54": [
+"0x6dbbddb0"
+]
+}
+},
+"0x1D84210F": {
+"Fixed": {},
+"Inputs": {
+"19": "0x6dbacd00",
+"20": "0x6dbacfa0",
+"21": "0x6dbcb870"
+},
+"Name": "Fire",
+"OutputSites": {}
+},
+"0x1EC1B15E": {
+"Fixed": {},
+"Inputs": {
+"1": "0x6dc33670"
+},
+"Name": "TeamChanger",
+"OutputSites": {}
+},
+"0x1FDD42BF": {
+"Fixed": {},
+"Inputs": {},
+"Name": "Decorative FX",
+"OutputSites": {}
+},
+"0x1FE33E92": {
+"Fixed": {},
+"Inputs": {
+"7": "0x6db24c10"
+},
+"Name": "Map Marker Trigger",
+"OutputSites": {}
+},
+"0x202383E5": {
+"Fixed": {
+"4097": "0x6dbbcba0",
+"4098": "0x6dbbcbb0"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"50": "0x6dbbd110",
+"51": "0x6dbbd100",
+"52": "0x6dbbd660"
+},
+"Name": "Ammo Box",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"53": [
+"0x6dbbd440"
+],
+"54": [
+"0x6dbbddb0"
+]
+}
+},
+"0x21C015A3": {
+"Fixed": {},
+"Inputs": {
+"13": "0x6dc29690",
+"14": "0x6dbcb870",
+"15": "0x6dc29780",
+"16": "0x6dc29790"
+},
+"Name": "Screen Fader",
+"OutputSites": {
+"17": [
+"0x6dc29ca0"
+]
+}
+},
+"0x22B79066": {
+"Fixed": {},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"28": "0x6dbba520",
+"29": "0x6dbba530",
+"39": "0x6db1caa0"
+},
+"Name": "Toilet",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"27": [
+"0x6dbba360"
+]
+}
+},
+"0x22E48520": {
+"Fixed": {
+"150": "0x6dc3b710",
+"151": "0x6dc3bc60",
+"4097": "0x6dbbcba0",
+"4098": "0x6dbbcbb0"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"50": "0x6dbbd110",
+"51": "0x6dbbd100",
+"52": "0x6dbbd660"
+},
+"Name": "Melee Weapon",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"53": [
+"0x6dbbd440"
+],
+"54": [
+"0x6dbbddb0"
+]
+}
+},
+"0x25965148": {
+"Fixed": {},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40"
+},
+"Name": "Breakable",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+]
+}
+},
+"0x26B5753E": {
+"Fixed": {},
+"Inputs": {
+"1": "0x6db8e510",
+"2": "0x6dbcb870"
+},
+"Name": "Damage Action Object",
+"OutputSites": {}
+},
+"0x285A9A1F": {
+"Fixed": {
+"104": "0x6dbe4f50"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"136": "0x6dbe1e10",
+"137": "0x6dbe2790",
+"14": "0x6dba1c40",
+"26": "0x6dbe30d0",
+"27": "0x6dbe4ea0"
+},
+"Name": "Burrower",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"168": [
+"0x6db87010"
+],
+"169": [
+"0x6dbe7390"
+],
+"28": [
+"0x6dbe2620",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"30": [
+"0x6db8dda0",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"31": [
+"0x6dbe3ab0"
+],
+"32": [
+"0x6dbe2440"
+],
+"34": [
+"0x6dbe3ab0"
+],
+"35": [
+"0x6dbe72c0"
+]
+}
+},
+"0x287EB67D": {
+"Fixed": {
+"4097": "0x6dbbcba0",
+"4098": "0x6dbbcbb0"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"50": "0x6dbbd110",
+"51": "0x6dbbd100",
+"52": "0x6dbbd660"
+},
+"Name": "Family Picture",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"53": [
+"0x6dbbd440"
+],
+"54": [
+"0x6dbbddb0"
+]
+}
+},
+"0x2A068D9B": {
+"Fixed": {
+"4097": "0x6dbbcba0",
+"4098": "0x6dbbcbb0"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"50": "0x6dbbd110",
+"51": "0x6dbbd100",
+"52": "0x6dbbd660"
+},
+"Name": "Map Pack",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"53": [
+"0x6dbbd440"
+],
+"54": [
+"0x6dbbddb0"
+]
+}
+},
+"0x2AB838A7": {
+"Fixed": {},
+"Inputs": {
+"5": "0x6db14910",
+"6": "0x6db14ba0"
+},
+"Name": "GUI Launcher",
+"OutputSites": {}
+},
+"0x2C3BC493": {
+"Fixed": {},
+"Inputs": {
+"12": "0x6dc28fa0",
+"13": "0x6dc29520",
+"14": "0x6dbcb870"
+},
+"Name": "Screen Blur",
+"OutputSites": {}
+},
+"0x2FB36366": {
+"Fixed": {},
+"Inputs": {
+"4": "0x6db51e80"
+},
+"Name": "Archives Trigger",
+"OutputSites": {}
+},
+"0x30122BAC": {
+"Fixed": {
+"104": "0x6dbe4f50"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"136": "0x6dbe1e10",
+"137": "0x6dbe2790",
+"14": "0x6dba1c40",
+"26": "0x6dbe30d0",
+"27": "0x6dbe4ea0"
+},
+"Name": "Nooseman",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"168": [
+"0x6db87010"
+],
+"169": [
+"0x6dbe7390"
+],
+"28": [
+"0x6dbe2620",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"30": [
+"0x6db8dda0",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"31": [
+"0x6dbe3ab0"
+],
+"32": [
+"0x6dbe2440"
+],
+"34": [
+"0x6dbe3ab0"
+],
+"35": [
+"0x6dbe72c0"
+]
+}
+},
+"0x304ECFEC": {
+"Fixed": {},
+"Inputs": {
+"1": "0x6db8e510",
+"2": "0x6dbcb870",
+"3": "0x6db8e5f0"
+},
+"Name": "Link Manipulator Action Object",
+"OutputSites": {}
+},
+"0x36E88832": {
+"Fixed": {},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"32": "0x6db91070",
+"33": "0x6db910e0"
+},
+"Name": "Ambient Creature",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+]
+}
+},
+"0x38ACC9A1": {
+"Fixed": {},
+"Inputs": {
+"4": "0x6dc2eab0",
+"5": "0x6dc2edf0",
+"6": "0x6dc2ecf0"
+},
+"Name": "STOMP Player",
+"OutputSites": {
+"7": [
+"0x6dc2eb50"
+]
+}
+},
+"0x3C3D9695": {
+"Fixed": {},
+"Inputs": {
+"16": "0x6dbd2640",
+"17": "0x6dbd3a10",
+"18": "0x6dbd3a40",
+"19": "0x6dbd26a0",
+"20": "0x6dbd26b0",
+"21": "0x6dbd2660",
+"22": "0x6dbd39e0",
+"23": "0x6dbd3a70",
+"24": "0x6dbcb870"
+},
+"Name": "DripMorphingModel",
+"OutputSites": {
+"13": [
+"0x6dbd2e20"
+],
+"14": [
+"0x6dbd2e20"
+]
+}
+},
+"0x3F0D4EB2": {
+"Fixed": {},
+"Inputs": {
+"4": "0x6dc2eaa0",
+"5": "0x6dba7be0",
+"6": "0x6dba7e20"
+},
+"Name": "Detector",
+"OutputSites": {
+"7": [
+"0x6dba7c30"
+],
+"8": [
+"0x6dba7c30"
+],
+"9": [
+"0x6dba7e40"
+]
+}
+},
+"0x3F4C759C": {
+"Fixed": {},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"28": "0x6dbba520",
+"29": "0x6dbba530",
+"61": "0x6dc32d80",
+"62": "0x6dc32cf0"
+},
+"Name": "Switch",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"27": [
+"0x6dbba360"
+],
+"64": [
+"0x6dc314e0"
+],
+"65": [
+"0x6dc314e0"
+]
+}
+},
+"0x453EE273": {
+"Fixed": {},
+"Inputs": {
+"1": "0x6db8e510",
+"2": "0x6dbcb870",
+"7": "0x6dc2d6f0"
+},
+"Name": "Speech Player",
+"OutputSites": {}
+},
+"0x490379CD": {
+"Fixed": {
+"104": "0x6dbe4f50"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"136": "0x6dbe1e10",
+"137": "0x6dbe2790",
+"14": "0x6dba1c40",
+"26": "0x6dbe30d0",
+"27": "0x6dbe4ea0"
+},
+"Name": "Killjoy",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"168": [
+"0x6db87010"
+],
+"169": [
+"0x6dbe7390"
+],
+"28": [
+"0x6dbe2620",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"30": [
+"0x6db8dda0",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"31": [
+"0x6dbe3ab0"
+],
+"32": [
+"0x6dbe2440"
+],
+"34": [
+"0x6dbe3ab0"
+],
+"35": [
+"0x6dbe72c0"
+]
+}
+},
+"0x4A1EB7A1": {
+"Fixed": {},
+"Inputs": {
+"1": "0x6dc28fa0"
+},
+"Name": "Level Transition Remover",
+"OutputSites": {}
+},
+"0x4E28364F": {
+"Fixed": {
+"104": "0x6dbe4f50"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"136": "0x6dbe1e10",
+"137": "0x6dbe2790",
+"14": "0x6dba1c40",
+"26": "0x6dbe30d0",
+"27": "0x6dbe4ea0"
+},
+"Name": "Slayer",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"168": [
+"0x6db87010"
+],
+"169": [
+"0x6dbe7390"
+],
+"28": [
+"0x6dbe2620",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"30": [
+"0x6db8dda0",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"31": [
+"0x6dbe3ab0"
+],
+"32": [
+"0x6dbe2440"
+],
+"34": [
+"0x6dbe3ab0"
+],
+"35": [
+"0x6dbe72c0"
+]
+}
+},
+"0x52DAEC1A": {
+"Fixed": {
+"4097": "0x6dbbcba0",
+"4098": "0x6dbbcbb0"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"50": "0x6dbbd110",
+"51": "0x6dbbd100",
+"52": "0x6dbbd660"
+},
+"Name": "Insanity Attack Item",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"53": [
+"0x6dbbd440"
+],
+"54": [
+"0x6dbbddb0"
+]
+}
+},
+"0x53748F71": {
+"Fixed": {},
+"Inputs": {
+"27": "0x6db90660",
+"28": "0x6db90170",
+"29": "0x6db90300"
+},
+"Name": "Aim Controller",
+"OutputSites": {
+"30": [
+"0x6db90850"
+],
+"31": [
+"0x6db90850"
+]
+}
+},
+"0x5556A86A": {
+"Fixed": {},
+"Inputs": {
+"24": "0x6db8d810",
+"25": "0x6db8d840",
+"26": "0x6db8d330",
+"27": "0x6db8d340",
+"28": "0x6db8daf0",
+"29": "0x6db8d350"
+},
+"Name": "Action Dialog",
+"OutputSites": {}
+},
+"0x56CA8AD4": {
+"Fixed": {},
+"Inputs": {
+"3": "0x6dc20700"
+},
+"Name": "Player Spawn Point",
+"OutputSites": {}
+},
+"0x57CBC6E0": {
+"Fixed": {},
+"Inputs": {
+"6": "0x6db752a0",
+"7": "0x6db752c0",
+"8": "0x6dbcb870"
+},
+"Name": "Electric Shield",
+"OutputSites": {}
+},
+"0x5A410DDE": {
+"Fixed": {
+"4097": "0x6dbbcba0",
+"4098": "0x6dbbcbb0"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"50": "0x6dbbd110",
+"51": "0x6dbbd100",
+"52": "0x6dbbd660"
+},
+"Name": "Item",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"53": [
+"0x6dbbd440"
+],
+"54": [
+"0x6dbbddb0"
+]
+}
+},
+"0x5ED5D552": {
+"Fixed": {},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"28": "0x6dbba520",
+"29": "0x6dbba530"
+},
+"Name": "Quest Item Pickup",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"27": [
+"0x6dbba360"
+]
+}
+},
+"0x5FEBD8E9": {
+"Fixed": {},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"28": "0x6dbba520",
+"29": "0x6dbba530",
+"30": "0x6dc23540",
+"31": "0x6dc23560"
+},
+"Name": "Pushable",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"27": [
+"0x6dbba360"
+],
+"53": [
+"0x6dc22ca0"
+],
+"55": [
+"0x6dc22ca0"
+]
+}
+},
+"0x63158A64": {
+"Fixed": {},
+"Inputs": {
+"10": "0x6dba88e0",
+"11": "0x6dbcb870",
+"8": "0x6dba8340",
+"9": "0x6dba88a0"
+},
+"Name": "Drip",
+"OutputSites": {}
+},
+"0x64254E79": {
+"Fixed": {},
+"Inputs": {
+"7": "0x6db8aaf0",
+"8": "0x6db8ab70"
+},
+"Name": "Insanity Screen Flash",
+"OutputSites": {}
+},
+"0x6506A1BA": {
+"Fixed": {},
+"Inputs": {
+"6": "0x6db9d8c0"
+},
+"Name": "Camera Shake",
+"OutputSites": {}
+},
+"0x6535CE07": {
+"Fixed": {},
+"Inputs": {
+"1": "0x6db8e510",
+"2": "0x6dbcb870",
+"3": "0x6db8e5f0"
+},
+"Name": "Black And White Toggler Action Object",
+"OutputSites": {}
+},
+"0x671882A1": {
+"Fixed": {},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"28": "0x6dbba520",
+"29": "0x6dbba530"
+},
+"Name": "Ladder",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"27": [
+"0x6dbba360"
+]
+}
+},
+"0x69A9942B": {
+"Fixed": {
+"102": "0x6db19630",
+"103": "0x6db18c90"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"28": "0x6dbba520",
+"29": "0x6dbba530",
+"62": "0x6db196c0",
+"63": "0x6db19500"
+},
+"Name": "Mountable",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"27": [
+"0x6dbba360"
+],
+"64": [
+"0x6db19900"
+],
+"65": [
+"0x6db19900"
+]
+}
+},
+"0x6BB9D081": {
+"Fixed": {
+"4097": "0x6db036c0",
+"4098": "0x6db036d0"
+},
+"Inputs": {
+"1": "0x6db036e0",
+"2": "0x6db03750"
+},
+"Name": "Camera",
+"OutputSites": {}
+},
+"0x744DF9EA": {
+"Fixed": {},
+"Inputs": {
+"1": "0x6db8e510",
+"2": "0x6dbcb870"
+},
+"Name": "Inventory Add Remove",
+"OutputSites": {}
+},
+"0x768E45A4": {
+"Fixed": {},
+"Inputs": {
+"1": "0x6db8e510",
+"2": "0x6dbcb870"
+},
+"Name": "Reputation Points Sender",
+"OutputSites": {}
+},
+"0x794D8AE9": {
+"Fixed": {},
+"Inputs": {
+"1": "0x6db8e510",
+"2": "0x6dbcb870",
+"3": "0x6db0fec0",
+"4": "0x6db0fdd0",
+"5": "0x6db0fe40"
+},
+"Name": "Toggle Player Insanity Object",
+"OutputSites": {}
+},
+"0x7EA6E450": {
+"Fixed": {},
+"Inputs": {
+"50": "0x6dc19ad0",
+"51": "0x6dc19b50",
+"52": "0x6dc19b80"
+},
+"Name": "Particle Fountain",
+"OutputSites": {}
+},
+"0x7FE56467": {
+"Fixed": {},
+"Inputs": {
+"1": "0x6dba9a30",
+"2": "0x6dba9a50"
+},
+"Name": "EdgeToggler",
+"OutputSites": {}
+},
+"0x8352C1E2": {
+"Fixed": {},
+"Inputs": {
+"4": "0x6dc2a800",
+"5": "0x6dc2a360"
+},
+"Name": "Sky / Sun",
+"OutputSites": {}
+},
+"0x83A8B1D9": {
+"Fixed": {},
+"Inputs": {
+"1": "0x6dc37320",
+"2": "0x6dc37340",
+"3": "0x6dc37210"
+},
+"Name": "Visibility Toggler",
+"OutputSites": {}
+},
+"0x85449C44": {
+"Fixed": {},
+"Inputs": {
+"10": "0x6db15200",
+"11": "0x6db15240",
+"9": "0x6db152d0"
+},
+"Name": "Help Popup",
+"OutputSites": {
+"12": [
+"0x6db154d0"
+]
+}
+},
+"0x86A01249": {
+"Fixed": {
+"151": "0x6db93540",
+"152": "0x6db93580",
+"154": "0x6db93290"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"42": "0x6db93c60",
+"43": "0x6db93cc0",
+"44": "0x6db935b0",
+"45": "0x6db93290",
+"46": "0x6db932b0",
+"47": "0x6db932c0",
+"48": "0x6db932e0"
+},
+"Name": "Animating Static",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+]
+}
+},
+"0x8B3CE12E": {
+"Fixed": {},
+"Inputs": {
+"3": "0x6dc33cb0",
+"4": "0x6dc33d20",
+"5": "0x6dbcb870"
+},
+"Name": "Time Scale",
+"OutputSites": {}
+},
+"0x9710D816": {
+"Fixed": {
+"102": "0x6dc27b30",
+"103": "0x6dc279f0",
+"104": "0x6dc27730",
+"150": "0x6dc3b710",
+"151": "0x6dc3bc60",
+"4097": "0x6dbbcba0",
+"4098": "0x6dbbcbb0"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"50": "0x6dbbd110",
+"51": "0x6dbbd100",
+"52": "0x6dbbd660"
+},
+"Name": "Ranged Weapon",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"53": [
+"0x6dbbd440"
+],
+"54": [
+"0x6dbbddb0"
+]
+}
+},
+"0x973720C0": {
+"Fixed": {},
+"Inputs": {
+"11": "0x6dc28fa0",
+"12": "0x6dc15b80",
+"13": "0x6dc16e90",
+"14": "0x6dbcb870"
+},
+"Name": "Object Cloner",
+"OutputSites": {
+"15": [
+"0x6dc165b0"
+],
+"16": [
+"0x6dc165b0"
+],
+"17": [
+"0x6dc16d30"
+]
+}
+},
+"0x97844105": {
+"Fixed": {},
+"Inputs": {
+"1": "0x6dc263b0",
+"2": "0x6dc263a0"
+},
+"Name": "Ranged Targeting Position",
+"OutputSites": {}
+},
+"0x9AA22111": {
+"Fixed": {},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"28": "0x6dbba520",
+"29": "0x6dbba530",
+"44": "0x6db17050",
+"45": "0x6db17070"
+},
+"Name": "Light Housing",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"27": [
+"0x6dbba360"
+]
+}
+},
+"0xA019FCED": {
+"Fixed": {},
+"Inputs": {
+"15": "0x6dc37c00",
+"16": "0x6dc37c10",
+"17": "0x6dc37c20"
+},
+"Name": "Volumetric Fog",
+"OutputSites": {}
+},
+"0xA04C8098": {
+"Fixed": {},
+"Inputs": {
+"21": "0x6dc2fd20",
+"22": "0x6dc2f630"
+},
+"Name": "Stream",
+"OutputSites": {}
+},
+"0xA2C3F6A6": {
+"Fixed": {
+"4097": "0x6dbbcba0",
+"4098": "0x6dbbcbb0"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"50": "0x6dbbd110",
+"51": "0x6dbbd100",
+"52": "0x6dbbd660"
+},
+"Name": "Map Item",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"53": [
+"0x6dbbd440"
+],
+"54": [
+"0x6dbbddb0"
+]
+}
+},
+"0xAA7D6985": {
+"Fixed": {},
+"Inputs": {
+"7": "0x6dbbc940",
+"8": "0x6dbbc920"
+},
+"Name": "Invisible Static Object",
+"OutputSites": {}
+},
+"0xAAAD15CA": {
+"Fixed": {},
+"Inputs": {
+"10": "0x6dbe03b0",
+"11": "0x6dbe0000",
+"12": "0x6dbdff50"
+},
+"Name": "Movie Player",
+"OutputSites": {}
+},
+"0xAB9213ED": {
+"Fixed": {},
+"Inputs": {
+"1": "0x6db8e510",
+"2": "0x6dbcb870",
+"3": "0x6db0fc10",
+"4": "0x6db0fc80",
+"5": "0x6db0fcf0"
+},
+"Name": "Allow Player Insanity Object",
+"OutputSites": {}
+},
+"0xAE8E573B": {
+"Fixed": {},
+"Inputs": {
+"15": "0x6dc37c00",
+"16": "0x6dc37c10",
+"17": "0x6dc37c20"
+},
+"Name": "Volumetric Insects",
+"OutputSites": {}
+},
+"0xB51C3DA1": {
+"Fixed": {},
+"Inputs": {
+"16": "0x6dbd2640",
+"17": "0x6dbd3a10",
+"18": "0x6dbd3a40",
+"19": "0x6dbd26a0",
+"20": "0x6dbd26b0",
+"21": "0x6dbd2660",
+"22": "0x6dbd39e0",
+"23": "0x6dbd3a70",
+"24": "0x6dbcb870"
+},
+"Name": "MorphingModel",
+"OutputSites": {
+"13": [
+"0x6dbd2e20"
+],
+"14": [
+"0x6dbd2e20"
+]
+}
+},
+"0xB8B2FD1F": {
+"Fixed": {},
+"Inputs": {
+"11": "0x6db981c0",
+"12": "0x6dc2eaa0",
+"13": "0x6db97e10",
+"14": "0x6dbcb870",
+"15": "0x6db984e0",
+"16": "0x6db98510"
+},
+"Name": "Behavior Changer",
+"OutputSites": {}
+},
+"0xBB1FC4A1": {
+"Fixed": {},
+"Inputs": {
+"2": "0x6db95220",
+"3": "0x6db95230"
+},
+"Name": "Attachment",
+"OutputSites": {}
+},
+"0xBD83621B": {
+"Fixed": {},
+"Inputs": {
+"11": "0x6dbaefa0",
+"12": "0x6dbaefe0",
+"13": "0x6dbcb870"
+},
+"Name": "Flying Sound",
+"OutputSites": {}
+},
+"0xBE08B1A0": {
+"Fixed": {},
+"Inputs": {
+"31": "0x6dbcb870",
+"32": "0x6dbb43d0",
+"33": "0x6dbb4350",
+"34": "0x6dbb4410",
+"35": "0x6dbb4360"
+},
+"Name": "Object Generator",
+"OutputSites": {}
+},
+"0xC3F8C321": {
+"Fixed": {
+"104": "0x6dbe4f50"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"136": "0x6dbe1e10",
+"137": "0x6dbe2790",
+"14": "0x6dba1c40",
+"26": "0x6dbe30d0",
+"27": "0x6dbe4ea0"
+},
+"Name": "NPC",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"28": [
+"0x6db335e0",
+"0x6dbe2620",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"30": [
+"0x6db335e0",
+"0x6db8dda0",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"31": [
+"0x6dbe3ab0"
+],
+"32": [
+"0x6dbe2440"
+],
+"34": [
+"0x6dbe3ab0"
+],
+"35": [
+"0x6dbe72c0"
+]
+}
+},
+"0xC8BC44E1": {
+"Fixed": {
+"100": "0x6db286f0",
+"101": "0x6db287e0",
+"102": "0x6db285d0",
+"103": "0x6db286a0",
+"104": "0x6db298c0",
+"105": "0x6db280d0",
+"108": "0x6db39430",
+"109": "0x6db27910",
+"110": "0x6db27940",
+"112": "0x6db3a9a0",
+"113": "0x6db3a9f0",
+"114": "0x6db33f80",
+"115": "0x6db27b00",
+"116": "0x6db27b30",
+"117": "0x6db29110",
+"120": "0x6db1f750",
+"121": "0x6db43670",
+"12292": "0x6db36f10",
+"12293": "0x6db34880",
+"15": "0x6db41ee0",
+"151": "0x6db49f10",
+"152": "0x6db48a80",
+"153": "0x6db341d0",
+"200": "0x6db42cd0",
+"201": "0x6db42cd0",
+"202": "0x6db42cd0",
+"203": "0x6db42cd0",
+"204": "0x6db42cd0",
+"205": "0x6db42cd0",
+"220": "0x6db44970",
+"221": "0x6db444c0",
+"230": "0x6db29310",
+"231": "0x6db2ae40",
+"232": "0x6db28010",
+"400": "0x6db34910",
+"401": "0x6db34a10",
+"4097": "0x6db42650",
+"4098": "0x6db426d0",
+"451": "0x6db2d980",
+"6": "0x6db41ee0",
+"92": "0x6db43890",
+"94": "0x6db41ef0"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"35": "0x6db34f50"
+},
+"Name": "Player",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+]
+}
+},
+"0xCA9F664A": {
+"Fixed": {},
+"Inputs": {
+"10": "0x6dbcb870",
+"6": "0x6dc33b50",
+"7": "0x6dc33b30",
+"8": "0x6dc33850",
+"9": "0x6dc33870"
+},
+"Name": "Timer",
+"OutputSites": {
+"11": [
+"0x6dc33a90"
+]
+}
+},
+"0xCD739B63": {
+"Fixed": {},
+"Inputs": {
+"11": "0x6dba0670"
+},
+"Name": "Combat Music",
+"OutputSites": {}
+},
+"0xCF3A3FA5": {
+"Fixed": {
+"4097": "0x6dbbcba0",
+"4098": "0x6dbbcbb0"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"50": "0x6dbbd110",
+"51": "0x6dbbd100",
+"52": "0x6dbbd660"
+},
+"Name": "Flashlight",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"53": [
+"0x6dbbd440"
+],
+"54": [
+"0x6dbbddb0"
+]
+}
+},
+"0xD44B5953": {
+"Fixed": {},
+"Inputs": {
+"4": "0x6dbcbc50",
+"5": "0x6dbcb880",
+"6": "0x6dbcb890",
+"7": "0x6dbcb870"
+},
+"Name": "Message Relay",
+"OutputSites": {
+"8": [
+"0x6dbcbc50"
+]
+}
+},
+"0xD61BC46F": {
+"Fixed": {},
+"Inputs": {
+"15": "0x6dc37c00",
+"16": "0x6dc37c10",
+"17": "0x6dc37c20"
+},
+"Name": "Volumetric Rain",
+"OutputSites": {}
+},
+"0xD8E872CE": {
+"Fixed": {},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"28": "0x6dbba520",
+"29": "0x6dbba530",
+"44": "0x6db17050",
+"45": "0x6db17070",
+"70": "0x6db1a970",
+"71": "0x6db1a980"
+},
+"Name": "Security Monitor",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"27": [
+"0x6dbba360"
+],
+"72": [
+"0x6db1b4a0"
+],
+"73": [
+"0x6db1bb30"
+]
+}
+},
+"0xDB1BE225": {
+"Fixed": {
+"104": "0x6dbe4f50"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"136": "0x6dbe1e10",
+"137": "0x6dbe2790",
+"14": "0x6dba1c40",
+"26": "0x6dbe30d0",
+"27": "0x6dbe4ea0"
+},
+"Name": "CartWheeler",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"168": [
+"0x6db87010"
+],
+"169": [
+"0x6dbe7390"
+],
+"28": [
+"0x6dbe2620",
+"0x6dbe2f70",
+"0x6dbe5d00",
+"0x6dbec5a0"
+],
+"29": [
+"0x6dbec5a0"
+],
+"30": [
+"0x6db8dda0",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"31": [
+"0x6dbe3ab0"
+],
+"32": [
+"0x6dbe2440"
+],
+"34": [
+"0x6dbe3ab0"
+],
+"35": [
+"0x6dbe72c0"
+]
+}
+},
+"0xDD88E091": {
+"Fixed": {},
+"Inputs": {
+"8": "0x6db913c0",
+"9": "0x6db913d0"
+},
+"Name": "Ambient Creature Waypoint",
+"OutputSites": {}
+},
+"0xDF14E5A3": {
+"Fixed": {},
+"Inputs": {
+"1": "0x6dc20ee0"
+},
+"Name": "Instance Prefetcher",
+"OutputSites": {}
+},
+"0xE2EBCB51": {
+"Fixed": {
+"104": "0x6dbe4f50"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"136": "0x6dbe1e10",
+"137": "0x6dbe2790",
+"14": "0x6dba1c40",
+"26": "0x6dbe30d0",
+"27": "0x6dbe4ea0"
+},
+"Name": "Fester",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"168": [
+"0x6db87010"
+],
+"169": [
+"0x6dbe7390"
+],
+"28": [
+"0x6dbe2620",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"30": [
+"0x6db8dda0",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"31": [
+"0x6dbe3ab0"
+],
+"32": [
+"0x6dbe2440"
+],
+"34": [
+"0x6dbe3ab0"
+],
+"35": [
+"0x6dbe72c0"
+]
+}
+},
+"0xE4002F8D": {
+"Fixed": {},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"28": "0x6dbba520",
+"29": "0x6dbba530",
+"39": "0x6db1a2e0",
+"40": "0x6db1a310",
+"41": "0x6db1a360",
+"42": "0x6db1a3b0",
+"43": "0x6db1a400",
+"44": "0x6db1a450"
+},
+"Name": "Phone",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"27": [
+"0x6dbba360"
+]
+}
+},
+"0xE589963F": {
+"Fixed": {
+"104": "0x6dbe4f50"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"136": "0x6dbe1e10",
+"137": "0x6dbe2790",
+"14": "0x6dba1c40",
+"26": "0x6dbe30d0",
+"27": "0x6dbe4ea0"
+},
+"Name": "Horace",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"168": [
+"0x6db87010"
+],
+"169": [
+"0x6dbe7390"
+],
+"28": [
+"0x6dbe2620",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"30": [
+"0x6db8dda0",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"31": [
+"0x6dbe3ab0"
+],
+"32": [
+"0x6dbe2440"
+],
+"34": [
+"0x6dbe3ab0"
+],
+"35": [
+"0x6dbe72c0"
+]
+}
+},
+"0xE6EC6C84": {
+"Fixed": {},
+"Inputs": {
+"19": "0x6db92d60",
+"20": "0x6db92dd0"
+},
+"Name": "Ambient Sound",
+"OutputSites": {}
+},
+"0xE8B96B57": {
+"Fixed": {},
+"Inputs": {
+"0": "0x6dc20cd0"
+},
+"Name": "Node Prefetcher",
+"OutputSites": {}
+},
+"0xEC32498A": {
+"Fixed": {},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"28": "0x6dbba520",
+"29": "0x6dbba530"
+},
+"Name": "Clamber Point",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"27": [
+"0x6dbba360"
+]
+}
+},
+"0xEC6354A8": {
+"Fixed": {
+"104": "0x6dbe4f50"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"136": "0x6dbe1e10",
+"137": "0x6dbe2790",
+"14": "0x6dba1c40",
+"26": "0x6dbe30d0",
+"27": "0x6dbe4ea0"
+},
+"Name": "Inferna",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"168": [
+"0x6db87010"
+],
+"169": [
+"0x6dbe7390"
+],
+"28": [
+"0x6dbe2620",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"30": [
+"0x6db8dda0",
+"0x6dbe2f70",
+"0x6dbe5d00"
+],
+"31": [
+"0x6dbe3ab0"
+],
+"32": [
+"0x6dbe2440"
+],
+"34": [
+"0x6dbe3ab0"
+],
+"35": [
+"0x6dbe72c0"
+]
+}
+},
+"0xECA9EA64": {
+"Fixed": {},
+"Inputs": {
+"3": "0x6dbaf9f0",
+"4": "0x6dbafb00"
+},
+"Name": "Fog / Sky Switcher",
+"OutputSites": {}
+},
+"0xED6B2FF8": {
+"Fixed": {},
+"Inputs": {
+"14": "0x6dc2ce90",
+"15": "0x6dc2c560",
+"16": "0x6dc2c5a0",
+"17": "0x6dbcb870"
+},
+"Name": "Sound Effect",
+"OutputSites": {
+"18": [
+"0x6dc2ccc0"
+]
+}
+},
+"0xF1F8D975": {
+"Fixed": {},
+"Inputs": {
+"1": "0x6db8e510",
+"2": "0x6dbcb870"
+},
+"Name": "Adrenaline Sender",
+"OutputSites": {}
+},
+"0xF64677A7": {
+"Fixed": {},
+"Inputs": {
+"12": "0x6dc263a0",
+"13": "0x6dc21e40"
+},
+"Name": "Pressure Plate",
+"OutputSites": {
+"0": [
+"0x6dc21f10"
+],
+"1": [
+"0x6dc21f10"
+]
+}
+},
+"0xF67A582E": {
+"Fixed": {},
+"Inputs": {
+"37": "0x6db12160",
+"38": "0x6db12160"
+},
+"Name": "Crane",
+"OutputSites": {}
+},
+"0xFE9F718D": {
+"Fixed": {
+"4097": "0x6dbbcba0",
+"4098": "0x6dbbcbb0"
+},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"50": "0x6dbbd110",
+"51": "0x6dbbd100",
+"52": "0x6dbbd660"
+},
+"Name": "Missile Item",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"53": [
+"0x6dbbd440"
+],
+"54": [
+"0x6dbbddb0"
+]
+}
+},
+"0xFFAEB496": {
+"Fixed": {},
+"Inputs": {
+"11": "0x6dba1c50",
+"12": "0x6dba1c60",
+"13": "0x6dba1c30",
+"14": "0x6dba1c40",
+"69": "0x6db702d0",
+"70": "0x6db6e300",
+"71": "0x6db6e310",
+"72": "0x6db70060",
+"73": "0x6db6e320"
+},
+"Name": "Black One",
+"OutputSites": {
+"15": [
+"0x6dba31b0"
+],
+"21": [
+"0x6db9b410"
+],
+"74": [
+"0x6db70060"
+],
+"75": [
+"0x6db70090"
+],
+"76": [
+"0x6db6f260"
+],
+"77": [
+"0x6db6e880",
+"0x6db6f100",
+"0x6db702d0"
+],
+"78": [
+"0x6db6dff0"
+]
+}
+}
+}
+}

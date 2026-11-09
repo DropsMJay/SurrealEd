@@ -39,11 +39,24 @@ class RiotViewport {
     Sun.position.set(0.4, 1, 0.25);
     this.Scene.add(Sun);
     this.Camera = new THREE.PerspectiveCamera(60, 1, 0.05, 4000);
+    // PT: câmera ortográfica: segue a posição/rotação da câmera em perspectiva; o tamanho vem da distância do foco
+    // EN: orthographic camera: follows the perspective camera; its size comes from the focus distance
+    this.OrthoCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -5000, 5000);
+    this.Orthographic = false;
+    this.OnCameraChange = null;
     this.Controls = new RiotCameraControls(this.Camera, this.Renderer.domElement);
+    this.Controls.Viewport = this;
+    this.Grid = new THREE.GridHelper(1000, 1000, 0x6a6f63, 0x2c302a);
+    this.Grid.material.transparent = true;
+    this.Grid.material.opacity = 0.45;
+    this.Grid.material.depthWrite = false;
+    this.Grid.visible = false;
+    this.Grid.renderOrder = -1;
+    this.Scene.add(this.Grid);
     this.Pickables = [];
     this.OnPick = null;
     this.OnFrame = null;
-    this.RenderMode = { Textured: true, Wireframe: false };
+    this.RenderMode = { Textured: true, Wireframe: false, Display: 'Normal' };
     this.Clock = new THREE.Clock();
     this.Raycaster = new THREE.Raycaster();
     this.Pointer = new THREE.Vector2();
@@ -63,6 +76,28 @@ class RiotViewport {
     this.Camera.updateProjectionMatrix();
   }
 
+  /** PT: Câmera usada para desenhar e clicar. EN: Camera used to draw and pick. */
+  get ViewCamera() { return this.Orthographic ? this.OrthoCamera : this.Camera; }
+
+  /** PT: Liga/desliga a projeção ortográfica. EN: Turns orthographic projection on/off. */
+  SetOrthographic(On) {
+    if (this.Orthographic === Boolean(On)) return;
+    this.Orthographic = Boolean(On);
+    this.SyncOrtho();
+    if (this.OnCameraChange) this.OnCameraChange(this.ViewCamera);
+  }
+
+  SyncOrtho() {
+    if (!this.Orthographic) return;
+    const Ortho = this.OrthoCamera, Camera = this.Camera;
+    const Half = Math.max(0.05, this.Controls.FocusDistance * Math.tan(THREE.MathUtils.degToRad(Camera.fov) / 2));
+    Ortho.left = -Half * Camera.aspect; Ortho.right = Half * Camera.aspect; Ortho.top = Half; Ortho.bottom = -Half;
+    Ortho.position.copy(Camera.position);
+    Ortho.quaternion.copy(Camera.quaternion);
+    Ortho.updateProjectionMatrix();
+    Ortho.updateMatrixWorld();
+  }
+
   BindEvents() {
     const Canvas = this.Renderer.domElement;
     let Down = null;
@@ -72,7 +107,7 @@ class RiotViewport {
       if (!Down || Math.hypot(Event.clientX - Down[0], Event.clientY - Down[1]) > 4 || Event.button !== 0 || Event.altKey) return;
       const Rect = Canvas.getBoundingClientRect();
       this.Pointer.set(((Event.clientX - Rect.left) / Rect.width) * 2 - 1, -((Event.clientY - Rect.top) / Rect.height) * 2 + 1);
-      this.Raycaster.setFromCamera(this.Pointer, this.Camera);
+      this.Raycaster.setFromCamera(this.Pointer, this.ViewCamera);
       // PT: ícones (luzes) primeiro: ficam por cima de tudo / EN: icons (lights) first, they are drawn on top
       const Markers = (this.Markers || []).filter(Marker => Marker.visible && Marker.parent && Marker.parent.visible);
       const Hit = this.Raycaster.intersectObjects(Markers, false)[0] || this.Raycaster.intersectObjects(this.Pickables.filter(Mesh => Mesh.visible), false)[0] || null;
@@ -88,8 +123,9 @@ class RiotViewport {
       const LogicStart = performance.now();
       this.Controls.Update(Delta);
       if (this.OnFrame) this.OnFrame(Delta);
+      this.SyncOrtho();
       const DrawStart = performance.now();
-      if (this.SkyScene && this.SkyScene.visible) {
+      if (this.SkyScene && this.SkyScene.visible && !this.Orthographic) {
         // PT: céu primeiro, centrado na câmera e sem profundidade; depois a fase por cima
         // EN: sky first, centred on the camera without depth; then the level on top
         const Background = this.Scene.background;
@@ -106,7 +142,7 @@ class RiotViewport {
         this.Renderer.render(this.Scene, this.Camera);
         this.Scene.background = Background;
         this.Renderer.autoClear = true;
-      } else this.Renderer.render(this.Scene, this.Camera);
+      } else this.Renderer.render(this.Scene, this.ViewCamera);
       this.CountFrame(DrawStart - LogicStart, performance.now() - DrawStart);
       requestAnimationFrame(Step);
     };
@@ -175,15 +211,40 @@ class RiotViewport {
    * EN: Applies render modes to every registered mesh (keeping the original material).
    */
   ApplyRenderMode() {
+    // PT: modos de exibição (menu View): Normal, Wireframe, Overdraw, Lighting (sem textura), Unshaded (sem luz)
+    // EN: display modes (View menu)
+    const Display = this.RenderMode.Display || 'Normal';
+    if (!this.OverdrawMaterial) {
+      this.OverdrawMaterial = new THREE.MeshBasicMaterial({ color: 0x140a03, blending: THREE.AdditiveBlending, transparent: true,
+        depthTest: false, depthWrite: false, side: THREE.DoubleSide });
+    }
     for (const Mesh of this.Pickables) {
       if (!Mesh.userData.OriginalMaterial) Mesh.userData.OriginalMaterial = Mesh.material;
       const Original = Mesh.userData.OriginalMaterial;
-      let Material = Original;
-      if (!this.RenderMode.Textured) {
+      const Plain = () => {
         if (!Mesh.userData.PlainMaterial) Mesh.userData.PlainMaterial = Mesh.userData.MakePlain ? Mesh.userData.MakePlain() : Original;
-        Material = Mesh.userData.PlainMaterial;
-      }
-      Material.wireframe = this.RenderMode.Wireframe;
+        return Mesh.userData.PlainMaterial;
+      };
+      let Material = Original;
+      if (Display === 'Overdraw') Material = this.OverdrawMaterial;
+      else if (Display === 'Unshaded') {
+        if (!Mesh.userData.UnshadedMaterial && Mesh.userData.MakeUnshaded) Mesh.userData.UnshadedMaterial = Mesh.userData.MakeUnshaded();
+        // PT: já sem luz (tingidos, aditivos): o próprio material / EN: already unlit (tinted, additive): the material itself
+        if (!Mesh.userData.UnshadedMaterial && Original.isMeshBasicMaterial && !Original.onBeforeCompile.toString().includes('Shader')) Mesh.userData.UnshadedMaterial = Original;
+        if (!Mesh.userData.UnshadedMaterial) {
+          // PT: copia também a equação e os fatores da mistura (subtrair, multiplicar...), senão vira alfa comum
+          // EN: also copy blend equation and factors (subtract, multiply...), otherwise it becomes plain alpha
+          Mesh.userData.UnshadedMaterial = new THREE.MeshBasicMaterial({
+            map: Original.map || null, color: Original.map ? 0xffffff : (Original.color || new THREE.Color(0xb0b0a8)),
+            transparent: Original.transparent, opacity: Original.opacity, alphaTest: Original.alphaTest, side: Original.side,
+            blending: Original.blending, blendEquation: Original.blendEquation, blendSrc: Original.blendSrc, blendDst: Original.blendDst,
+            premultipliedAlpha: Original.premultipliedAlpha, depthWrite: Original.depthWrite,
+            polygonOffset: Original.polygonOffset, polygonOffsetFactor: Original.polygonOffsetFactor, polygonOffsetUnits: Original.polygonOffsetUnits });
+        }
+        Material = Mesh.userData.UnshadedMaterial;
+      } else if (Display === 'Lighting' || Display === 'Wireframe' || !this.RenderMode.Textured) Material = Plain();
+      for (const Item of [Original, Mesh.userData.PlainMaterial, Mesh.userData.UnshadedMaterial]) if (Item) Item.wireframe = false;
+      if (Material !== this.OverdrawMaterial) Material.wireframe = Display === 'Wireframe' || this.RenderMode.Wireframe;
       Mesh.material = Material;
     }
   }
@@ -193,7 +254,7 @@ class RiotViewport {
     for (const Mesh of this.Pickables) {
       this.Scene.remove(Mesh);
       Mesh.geometry.dispose();
-      for (const Key of ['OriginalMaterial', 'PlainMaterial']) if (Mesh.userData[Key]) Mesh.userData[Key].dispose();
+      for (const Key of ['OriginalMaterial', 'PlainMaterial', 'UnshadedMaterial']) if (Mesh.userData[Key] && (Key === 'OriginalMaterial' || Mesh.userData[Key] !== Mesh.userData.OriginalMaterial)) Mesh.userData[Key].dispose();
       Mesh.material.dispose();
     }
     this.Pickables = [];

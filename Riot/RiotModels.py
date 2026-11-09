@@ -118,6 +118,35 @@ def ReadModel(Container, Index, AllLods=False):
     return Model
 
 
+def ModelBounds(Container, Index):
+    """
+    PT: Esfera (4 floats) + caixa (12 floats) que o modelo declara: no 0x0207 (estáticos, depois de u16, u16, f) ou no
+        começo do 0x0208 (animados). É exatamente o que o bloco "modelo próprio" de uma instância (.lvl, flag 0x8000)
+        guarda: conferido nas 119 instâncias do TS1 que têm o bloco (todas idênticas byte a byte).
+    EN: The model's declared sphere + box (0x0207 after u16, u16, f; or the start of 0x0208). Exactly what an
+        instance's own-model block stores (checked on all 119 TS1 instances with the block).
+    """
+    Resource = Container.Resource(Index)
+    for Type, Offset in ((0x0207, 8), (0x0208, 0)):
+        Chunk = Resource.get(Type)
+        if Chunk and Chunk.Size >= Offset + 64:
+            return struct.unpack_from('<16f', Container.Data, Chunk.Offset + Offset)
+    return None
+
+
+def SetModelMaterial(Data, Offset, Size, Slot, MaterialRef):
+    """
+    PT: Pedaço 0x0200 com a referência de material Slot trocada (mesmo tamanho). EN: 0x0200 chunk with one material ref swapped.
+    """
+    Chunk = bytearray(Data[Offset:Offset + Size])
+    Position = 8 + (4 if struct.unpack_from('<I', Chunk, 0)[0] & 0x20000 else 0)
+    Count = struct.unpack_from('<I', Chunk, Position)[0]
+    if not 0 <= Slot < Count or Position + 4 + 4 * (Slot + 1) > len(Chunk):
+        raise ValueError('no material slot %d / slot de material inexistente' % Slot)
+    struct.pack_into('<HH', Chunk, Position + 4 + 4 * Slot, MaterialRef & 0xFFFF, MaterialRef >> 16)
+    return bytes(Chunk)
+
+
 class RiotModelStore:
     """PT: Modelos de todos os pacotes, por referência (com cache). EN: Models of every package, cached."""
 

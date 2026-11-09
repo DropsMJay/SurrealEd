@@ -45,10 +45,32 @@ class RiotStompPlayer {
     this.Stop();
     const Scene = this.LevelView.Scene;
     if (!Scene) return false;
-    const ByTime = (A, B) => A.Time - B.Time;
     this.Sequence = Sequence;
     this.Time = 0;
-    this.Tracks = Sequence.Tracks.map(Track => {
+    this.Tracks = this.BuildTracks(Sequence);
+    this.BuildEffectEvents(Sequence);
+    this.CameraTrack = this.Tracks.find(Item => Item.IsCamera && Item.Keys.length) || null;
+    const Camera = this.Viewport.Camera, Forward = new THREE.Vector3();
+    Camera.getWorldDirection(Forward);
+    this.SavedView = [Camera.position.clone(), Camera.position.clone().add(Forward.multiplyScalar(5)), Camera.fov];
+    this.Log = [];
+    // PT: a cena mostra os objetos das trilhas, mesmo os escondidos no início (Hermes e Killjoy na 1b têm flags 0)
+    // EN: the scene shows its tracks' objects, even hidden-at-start ones
+    for (const Item of this.Tracks) if (Item.Number >= 0) { this.LevelView.ForceShown.add(Item.Number); this.LevelView.UpdateInstance(Item.Number); }
+    // PT: modo cinema: marcadores do editor e colisão invisível saem da frente (mesmo com "All" no filtro de classes)
+    // EN: cinema mode: editor markers and invisible collision get out of the way
+    this.LevelView.SetCinema(true);
+    if (!this.CameraTrack) this.Frame0();
+    this.Apply();
+    this.Loading = this.LoadRigs(Sequence);
+    return true;
+  }
+
+  /** PT: Trilhas prontas para tocar (chaves em ordem de tempo). EN: Playable tracks (keys in time order). */
+  BuildTracks(Sequence) {
+    const Scene = this.LevelView.Scene;
+    const ByTime = (A, B) => A.Time - B.Time;
+    return Sequence.Tracks.map(Track => {
       const Number = Scene.Instances.findIndex(Instance => Instance[6] === Track.Object);
       const Keys = Track.Events.filter(Event => Event.Type === 0).sort(ByTime).map(Event => {
         const [X, Y, Z, W] = Event.Rotation, Length = Math.hypot(X, Y, Z, W) || 1;
@@ -66,19 +88,93 @@ class RiotStompPlayer {
         Touched: false,
       };
     });
+  }
+
+  /**
+   * PT: Mensagens que ligam/desligam efeitos (o servidor resolve em Event.Effects, RiotMessageFlow.py), em ordem.
+   * EN: Messages that switch effects on/off (resolved by the server), in time order.
+   */
+  BuildEffectEvents(Sequence) {
+    // PT: títulos e flashes (TTB) numa camada por cima do visor / EN: on-screen titles and flashes
+    if (!this.Overlay && typeof RiotScreenOverlay !== 'undefined') this.Overlay = new RiotScreenOverlay(this.Viewport.Renderer.domElement.parentElement);
+    if (this.Overlay) this.Overlay.SetSequence(Sequence);
+    const Scene = this.LevelView.Scene, Numbers = new Map(Scene.Instances.map((Instance, Number) => [Instance[6], Number]));
+    this.EffectEvents = [];
+    for (const Track of Sequence.Tracks) for (const Event of Track.Events) {
+      if (Event.Type !== 7 || !Event.Effects) continue;
+      for (const [Id, Action] of Event.Effects) {
+        // PT: Lighting Effect pode não ter modelo: vai pelo id / EN: a Lighting Effect may have no model: keyed by id
+        const LightFx = (this.LevelView.LightFx || []).find(Effect => Effect.Id === Id);
+        if (LightFx) this.EffectEvents.push({ Time: Event.Time, Number: 'fx' + Id, LightFx, Action });
+        else if (Numbers.has(Id)) this.EffectEvents.push({ Time: Event.Time, Number: Numbers.get(Id), Action });
+      }
+    }
+    this.EffectEvents.sort((A, B) => A.Time - B.Time);
+  }
+
+  /**
+   * PT: Deixa os efeitos como devem estar no tempo atual (vale para tocar, voltar e pular): calcula o estado de cada um
+   *     pelas mensagens até agora e só muda o que difere.
+   * EN: Puts effects in the state they should have at the current time (play, rewind or jump).
+   */
+  ApplyEffects() {
+    if (this.Overlay) this.Overlay.Draw(this.Time);
+    const Particles = this.LevelView.Particles;
+    if (!Particles || !this.EffectEvents) return;
+    const Wanted = new Map(), LightFx = this.LightFxOf || (this.LightFxOf = new Map());
+    for (const Event of this.EffectEvents) {
+      if (Event.Time > this.Time + 1e-6) break;
+      const View = this.LevelView, IsFire = View.FireByNumber && View.FireByNumber.has(Event.Number);
+      if (Event.LightFx) LightFx.set(Event.Number, Event.LightFx);
+      const Current = Wanted.has(Event.Number) ? Wanted.get(Event.Number) : Event.LightFx ? Boolean(Event.LightFx.On)
+        : IsFire ? Boolean(View.FireByNumber.get(Event.Number).On) : Particles.StartsOnFor(Event.Number);
+      Wanted.set(Event.Number, Event.Action === 'Toggle' ? !Current : Event.Action === 'On');
+    }
+    this.EffectState = this.EffectState || new Map();
+    const Force = (Number, On) => {
+      if (LightFx.has(Number)) this.LevelView.SetLightEffectForced(LightFx.get(Number), On);
+      else if (!this.LevelView.SetFireForced(Number, On)) Particles.SetForced(Number, On === null ? null : On ? 'On' : 'Off');
+    };
+    const Set = (Number, On) => { Force(Number, On); this.EffectState.set(Number, On); };
+    for (const [Number, On] of Wanted) if (this.EffectState.get(Number) !== On) Set(Number, On);
+    // PT: sem mensagem até agora: volta ao estado inicial / EN: no message yet: back to the start state
+    for (const Number of [...this.EffectState.keys()]) if (!Wanted.has(Number)) {
+      Force(Number, null);
+      this.EffectState.delete(Number);
+    }
+  }
+
+  /**
+   * PT: Troca a sequência que está tocando por uma versão editada, sem recomeçar: mantém o tempo, a câmera salva e os
+   *     personagens já carregados (só busca modelos e clipes novos).
+   * EN: Swaps the playing sequence for an edited version without restarting: keeps time, saved view and loaded rigs.
+   */
+  Replace(Sequence) {
+    if (!this.Sequence || this.Sequence.Ref !== Sequence.Ref) return this.Start(Sequence);
+    const Old = this.Tracks, Clips = new Map();
+    for (const Item of Old) for (const Anim of Item.Anims) if (Anim.Clip) Clips.set(Anim.Ref, Anim.Clip);
+    this.Sequence = Sequence;
+    this.Tracks = this.BuildTracks(Sequence);
+    this.BuildEffectEvents(Sequence);
+    const Missing = [];
+    for (const Item of this.Tracks) {
+      const Previous = Old.find(Entry => Entry.Rig && Entry.Track.Object === Item.Track.Object && Entry.Number === Item.Number);
+      if (Previous && Item.Anims.length) { Item.Rig = Previous.Rig; Previous.Rig = null; Item.Touched = true; }
+      for (const Anim of Item.Anims) { Anim.Clip = Clips.get(Anim.Ref) || null; if (Item.Rig && !Anim.Clip) Missing.push(Anim); }
+      if (Item.Number >= 0 && !this.LevelView.ForceShown.has(Item.Number)) { this.LevelView.ForceShown.add(Item.Number); this.LevelView.UpdateInstance(Item.Number); }
+    }
+    for (const Item of Old) {
+      if (Item.Rig) { this.Viewport.Scene.remove(Item.Rig.Root); Item.Rig.Dispose(); Item.Rig = null; }
+      if (Item.Number >= 0 && Item.Touched) this.LevelView.UpdateInstance(Item.Number);
+    }
     this.CameraTrack = this.Tracks.find(Item => Item.IsCamera && Item.Keys.length) || null;
-    const Camera = this.Viewport.Camera, Forward = new THREE.Vector3();
-    Camera.getWorldDirection(Forward);
-    this.SavedView = [Camera.position.clone(), Camera.position.clone().add(Forward.multiplyScalar(5)), Camera.fov];
-    this.Log = [];
-    // PT: a cena mostra os objetos das trilhas, mesmo os escondidos no início (Hermes e Killjoy na 1b têm flags 0)
-    // EN: the scene shows its tracks' objects, even hidden-at-start ones
-    for (const Item of this.Tracks) if (Item.Number >= 0) { this.LevelView.ForceShown.add(Item.Number); this.LevelView.UpdateInstance(Item.Number); }
-    // PT: modo cinema: marcadores do editor e colisão invisível saem da frente (mesmo com "All" no filtro de classes)
-    // EN: cinema mode: editor markers and invisible collision get out of the way
-    this.LevelView.SetCinema(true);
-    if (!this.CameraTrack) this.Frame0();
+    this.Time = Math.min(this.Time, Sequence.Duration);
     this.Apply();
+    const Shared = RiotAssetTabs.Shared;
+    for (const Anim of Missing) {
+      const [Package, Index] = Shared.SplitRef(Anim.Ref);
+      fetch(`/api/Animation/${Package}/${Index}`).then(Response => Response.json()).then(Data => { if (this.Sequence === Sequence) { Anim.Clip = Data && !Data.Error ? Data : null; this.Apply(); } }).catch(() => {});
+    }
     this.Loading = this.LoadRigs(Sequence);
     return true;
   }
@@ -118,7 +214,7 @@ class RiotStompPlayer {
       return Clips.get(Ref);
     };
     await Promise.all(this.Tracks.map(async Item => {
-      if (Item.Number < 0 || !Item.Anims.length) return;
+      if (Item.Number < 0 || !Item.Anims.length || Item.Rig) return;
       const Key = this.LevelView.Scene.Instances[Item.Number][0];
       let Model = null;
       try { Model = await Shared.FetchModel(Key); } catch (Error) { Model = null; }
@@ -209,6 +305,12 @@ class RiotStompPlayer {
   Stop() {
     if (!this.Sequence) return;
     this.SetPlaying(false);
+    if (this.LevelView.Particles) this.LevelView.Particles.ClearForced();
+    this.LevelView.ClearFireForced();
+    if (this.LevelView.ClearLightEffectsForced) this.LevelView.ClearLightEffectsForced();
+    this.EffectState = new Map();
+    this.EffectEvents = [];
+    if (this.Overlay) this.Overlay.Clear();
     for (const Item of this.Tracks) {
       if (Item.Rig) { this.Viewport.Scene.remove(Item.Rig.Root); Item.Rig.Dispose(); Item.Rig = null; }
       if (Item.Number >= 0 && (Item.Touched || Item.Anims.length)) this.LevelView.UpdateInstance(Item.Number);
@@ -305,6 +407,7 @@ class RiotStompPlayer {
   // ------------------------------------------------------------------ aplicar / apply
   Apply() {
     if (!this.Sequence) return;
+    this.ApplyEffects();
     const View = this.LevelView, Matrix = new THREE.Matrix4(), Scale = new THREE.Matrix4(), Quat = new THREE.Quaternion();
     for (const Item of this.Tracks) {
       if (Item.Number < 0) continue;

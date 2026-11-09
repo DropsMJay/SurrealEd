@@ -69,35 +69,42 @@
     <button role="tab" class="Tab" data-tab="Audio" aria-selected="false" data-i18n="TabAudio">Áudio</button>
     <button role="tab" class="Tab" data-tab="STOMP" aria-selected="false">STOMP</button>
     <button role="tab" class="Tab" data-tab="Video" aria-selected="false" data-i18n="TabVideo">Vídeo</button>
+    <button role="tab" class="Tab" data-tab="Material" aria-selected="false" data-i18n="TabMaterial">Material</button>
+    <button role="tab" class="Tab" data-tab="Scripting" aria-selected="false" data-i18n="TabScripting">Scripting</button>
+    <button role="tab" class="Tab" data-tab="Strings" aria-selected="false" data-i18n="TabStrings">Strings</button>
   </nav>
 
   <main id="Workspace">
     <section id="ViewportArea" aria-label="Visor 3D">
       <div id="Viewport"></div>
 
-      <div id="InfoOverlay" class="Overlay">
+      <div id="InfoOverlay" class="Overlay" hidden>
         <div class="InfoFile" id="InfoFile"></div>
         <div class="InfoName" id="InfoName">—</div>
         <dl class="InfoStats" id="InfoStats"></dl>
       </div>
 
-      <div id="GizmoToolbar" class="Overlay" role="toolbar" aria-label="Gizmo">
-        <button class="ToolButton" data-gizmo="select" title="Q"><span data-i18n="GizmoSelect">Select</span> <kbd>Q</kbd></button>
-        <button class="ToolButton" data-gizmo="translate" title="W"><span data-i18n="GizmoMove">Move</span> <kbd>W</kbd></button>
-        <button class="ToolButton" data-gizmo="rotate" title="E"><span data-i18n="GizmoRotate">Rotate</span> <kbd>E</kbd></button>
-        <button class="ToolButton" data-gizmo="scale" title="R"><span data-i18n="GizmoScale">Scale</span> <kbd>R</kbd></button>
+      <div id="ViewHeader" role="toolbar" aria-label="Viewport">
+        <button class="IconButton" data-gizmo="select" data-tip="GizmoSelect" data-key="Q"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2l9 5-4 1-2 4z"/></svg></button>
+        <button class="IconButton" data-gizmo="translate" data-tip="GizmoMove" data-key="W"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1v14M1 8h14M8 1l-2 2M8 1l2 2M8 15l-2-2M8 15l2-2M1 8l2-2M1 8l2 2M15 8l-2-2M15 8l-2 2"/></svg></button>
+        <button class="IconButton" data-gizmo="rotate" data-tip="GizmoRotate" data-key="E"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-2-4M11 1v3h3"/></svg></button>
+        <button class="IconButton" data-gizmo="scale" data-tip="GizmoScale" data-key="R"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 14L14 2M9 2h5v5M2 9v5h5"/></svg></button>
         <span class="ToolSep"></span>
-        <button class="ToolButton" id="GizmoSpace" title="`"></button>
-        <label class="ToolSnap" title="Grid"><span>⌗</span><select id="SnapMove"><option value="0">—</option><option value="0.1">0.1</option><option value="0.5">0.5</option><option value="1">1</option><option value="5">5</option></select></label>
-        <label class="ToolSnap" title="Rotation"><span>∠</span><select id="SnapRotate"><option value="1">1°</option><option value="5">5°</option><option value="15">15°</option><option value="45">45°</option><option value="90">90°</option></select></label>
-        <label class="ToolSnap" title="Scale"><span>⤢</span><select id="SnapScale"><option value="0">—</option><option value="0.1">0.1</option><option value="0.25">0.25</option></select></label>
+        <button class="IconButton" id="GizmoSpace" data-key="`"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c-3 3-3 9 0 12M8 2c3 3 3 9 0 12"/></svg></button>
+        <label class="ToolSnap" data-tip="SnapMoveTip"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 5h14M1 11h14M5 1v14M11 1v14"/></svg><select id="SnapMove"><option value="0">—</option><option value="0.1">0.1</option><option value="0.5">0.5</option><option value="1">1</option><option value="5">5</option></select></label>
+        <label class="ToolSnap" data-tip="SnapRotateTip"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 14h12M2 14L12 4M8 14a6 6 0 0 0-2-4"/></svg><select id="SnapRotate"><option value="1">1°</option><option value="5">5°</option><option value="15">15°</option><option value="45">45°</option><option value="90">90°</option></select></label>
+        <label class="ToolSnap" data-tip="SnapScaleTip"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="7" width="7" height="7"/><path d="M9 7l5-5M10 2h4v4"/></svg><select id="SnapScale"><option value="0">—</option><option value="0.1">0.1</option><option value="0.25">0.25</option></select></label>
+        <span class="ToolSep"></span>
+        <button class="HeaderMenu" id="TransformMenuButton" data-i18n="MenuTransform">Transform</button>
+        <span class="HeaderSpacer"></span>
+        <span id="HeaderStats" class="HeaderStats" hidden></span>
+        <button class="IconButton" id="KeysButton" data-tip="KeysTip"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M6 6a2 2 0 1 1 3 1.7c-.7.4-1 .8-1 1.6M8 11.5v.5"/></svg></button>
       </div>
+      <button id="ViewPill" class="ViewPill"><span aria-hidden="true">⋮</span> <span id="ViewPillText">Perspective</span></button>
+      <div id="ViewDropMenu" class="DropMenu" hidden role="menu"></div>
 
-      <div id="RenderOverlay" class="Overlay">
-        <div class="RenderTitle" data-i18n="ViewportRendering">Renderização</div>
-        <label class="Radio"><input type="radio" name="RenderMode" value="Textured" checked> <span data-i18n="RenderTextured">Com textura</span></label>
-        <label class="Radio"><input type="radio" name="RenderMode" value="NoTexture"> <span data-i18n="RenderNoTexture">Sem textura</span></label>
-        <label class="Check"><input type="checkbox" id="RenderWireframe"> <span data-i18n="RenderWireframe">Wireframe</span></label>
+      <div id="RenderOverlay" class="Overlay" hidden>
+        <div class="RenderTitle"><span data-i18n="DisplayAdvanced">Display Advanced</span><button class="PanelClose" id="RenderOverlayClose" aria-label="Close">×</button></div>
         <label class="Check"><input type="checkbox" id="RenderNormals"> <span data-i18n="RenderNormals">Normais</span></label>
         <label class="Check"><input type="checkbox" id="RenderSky" checked> <span data-i18n="RenderSky">Céu (skybox)</span></label>
         <label class="Check"><input type="checkbox" id="RenderParticles" checked> <span data-i18n="RenderParticles">Efeitos de partículas</span></label>
@@ -119,7 +126,7 @@
         <div id="PerfStats" class="PerfLine"></div>
       </div>
 
-      <div id="KeysOverlay" class="Overlay Keys"><div data-i18n-html="KeysHelp"></div><div id="SpeedLabel"></div></div>
+      <div id="KeysOverlay" class="Overlay Keys" hidden><div data-i18n-html="KeysHelp"></div><div id="SpeedLabel"></div></div>
 
       <pre id="SelectionOverlay" class="Overlay" hidden aria-live="polite"></pre>
 
@@ -173,7 +180,8 @@
 
       <div class="PanelScroll" id="DetailsPane" role="tabpanel" aria-labelledby="TabDetails">
         <p class="PaneNote" data-i18n="PaneDetailsNote">O que está no .lvl: o objeto selecionado e as propriedades dele.</p>
-        <details class="Section" open>
+        <!-- PT: o resumo do objeto já aparece no visor (painel de informação); fica escondido aqui / EN: shown in the viewport overlay -->
+        <details class="Section" open hidden>
           <summary data-i18n="SectionSelection">Objeto selecionado</summary>
           <pre id="SelectionInfo" class="SelectionInfo Empty" data-i18n="SelectionEmpty">Clique num objeto no visor.</pre>
         </details>
@@ -325,26 +333,51 @@
       <aside class="AssetInfo" id="AudioInfo"></aside>
     </section>
 
-    <section id="STOMPPane" class="AssetPane" hidden aria-label="STOMP">
-      <aside class="AssetList">
-        <label class="BlockLabel" for="StompPackage" data-i18n="AssetPackage">Package</label>
-        <select id="StompPackage" class="PackageSelect"></select>
-        <input type="search" id="StompFilter" data-i18n-placeholder="StompFilterPlaceholder" placeholder="Filter: ref or track name…" aria-label="Filter sequences">
-        <div class="AssetCount" id="StompCount"></div>
-        <div id="StompList" class="AssetRows" role="listbox" aria-label="Sequences"></div>
-      </aside>
-      <section class="AssetStage MediaStage StompStage" id="StompStage">
-        <div class="DopeSheet" id="StompSheet"></div>
-        <canvas id="StompMap" class="StompMap"></canvas>
-        <div class="Timeline">
+    <section id="STOMPPane" class="AssetPane StompPane" hidden aria-label="STOMP">
+      <section class="StompMain">
+        <div class="StompPreview" id="StompPreview">
+          <div class="StompPreviewTitle"><b id="StompLevelName"></b><span id="StompSeqName"></span></div>
+          <div class="StompPreviewNote" id="StompPreviewNote" hidden></div>
+          <div class="StompPreviewSubtitle" id="StompTabSubtitle" hidden></div>
+          <p class="StageEmpty" id="StompEmpty" data-i18n="StompEmpty">Pick a level and a sequence on the right.</p>
+        </div>
+        <div class="Timeline StompTransport">
           <button class="ToolButton" id="StompPlay" data-i18n="AnimPlay">Play</button>
           <div class="TimeTrack"><input type="range" id="StompTime" min="0" max="1" step="0.001" value="0" aria-label="Time"></div>
           <span class="TimeLabel" id="StompTimeLabel">0.00 s</span>
           <label class="Check"><input type="checkbox" id="StompSound" checked> <span data-i18n="StompSound">Sound</span></label>
+          <label class="Check"><input type="checkbox" id="StompCamera" checked> <span data-i18n="StompSceneCamera">Scene camera</span></label>
+          <button class="ToolButton" id="StompExit" data-i18n="StompExit">Exit</button>
         </div>
-        <p class="StageEmpty" id="StompEmpty" data-i18n="StompEmpty">Pick a sequence on the left.</p>
+        <div class="StompEditBar" id="StompEditBar" hidden>
+          <select id="StompAddType" aria-label="Event type"></select>
+          <button class="ToolButton" id="StompAddKey" data-i18n="StompAddKey">+ Key</button>
+          <button class="ToolButton" id="StompKeyPose" data-i18n="StompKeyPose">Key pose (K)</button>
+          <button class="ToolButton" id="StompDuplicate" data-i18n="StompDuplicate">Duplicate</button>
+          <button class="ToolButton" id="StompDelete" data-i18n="StompDelete">Delete</button>
+          <span class="Sep"></span>
+          <button class="ToolButton" id="StompUndo" data-i18n="StompUndo">Undo</button>
+          <button class="ToolButton" id="StompRedo" data-i18n="StompRedo">Redo</button>
+          <span class="StompDirty" id="StompDirty"></span>
+          <button class="ToolButton" id="StompDiscard" data-i18n="StompDiscard">Discard</button>
+          <button class="ToolButton Primary" id="StompSave" data-i18n="StompSave">Save .qdu</button>
+        </div>
+        <div class="DopeSheet" id="StompSheet"></div>
       </section>
-      <aside class="AssetInfo" id="StompInfo"></aside>
+      <aside class="AssetInfo StompSide">
+        <label class="BlockLabel" for="StompLevel" data-i18n="StompLevelPick">Level (.lvl) — scenario</label>
+        <select id="StompLevel" class="PackageSelect"></select>
+        <label class="BlockLabel" for="StompFilter" data-i18n="StompSequences">Sequences (the level's .qdu)</label>
+        <input type="search" id="StompFilter" data-i18n-placeholder="StompFilterPlaceholder" placeholder="Filter: ref or track name…" aria-label="Filter sequences">
+        <div class="AssetCount" id="StompCount"></div>
+        <div id="StompList" class="AssetRows" role="listbox" aria-label="Sequences"></div>
+        <details class="StompDetails" id="StompDetails"><summary data-i18n="StompDetails">Sequence and key details</summary><div id="StompInfo"></div></details>
+        <div class="SideActions">
+          <button class="Button" id="StompExport" disabled data-i18n="Export">Export</button>
+          <button class="Button" id="StompImport" disabled data-i18n="Import">Import</button>
+          <input type="file" id="StompFile" accept=".json,application/json" hidden>
+        </div>
+      </aside>
     </section>
 
     <section id="VideoPane" class="AssetPane" hidden aria-label="Video">
@@ -359,6 +392,69 @@
         <p class="StageEmpty" id="VideoEmpty" data-i18n="VideoEmpty">Pick a video on the left.</p>
       </section>
       <aside class="AssetInfo" id="VideoInfo"></aside>
+    </section>
+    <section id="MaterialPane" class="AssetPane GraphPane" hidden aria-label="Material">
+      <section class="GraphMain MaterialMain">
+        <div class="MaterialPreview" id="MaterialPreview"><p class="StageEmpty" id="MaterialEmpty" data-i18n="MaterialEmpty">Pick a material on the right.</p></div>
+        <div class="GraphArea" id="MaterialGraph"></div>
+      </section>
+      <aside class="AssetInfo GraphSide">
+        <label class="BlockLabel" for="MaterialPackage" data-i18n="MaterialPackage">Package (.odu / .tdu)</label>
+        <select id="MaterialPackage" class="PackageSelect"></select>
+        <label class="BlockLabel" for="MaterialFilter" data-i18n="MaterialListLabel">Materials</label>
+        <input type="search" id="MaterialFilter" data-i18n-placeholder="MaterialFilterPlaceholder" placeholder="Filter: ref, class, texture, blend…">
+        <div class="AssetCount" id="MaterialCount"></div>
+        <div id="MaterialList" class="AssetRows" role="listbox" aria-label="Materials"></div>
+        <p class="Muted SideNote" data-i18n="MaterialNote">Saving changes the material in its .odu: every level that uses it changes too.</p>
+        <div class="SideActions"><span class="Muted" id="MaterialChanged"></span>
+          <button class="Button" id="MaterialRevert" disabled data-i18n="Revert">Revert</button>
+          <button class="Button Primary" id="MaterialSave" disabled data-i18n="Save">Save</button></div>
+        <div class="SideActions">
+          <button class="Button" id="MaterialExport" disabled data-i18n="Export">Export</button>
+          <button class="Button" id="MaterialImport" disabled data-i18n="Import">Import</button>
+          <input type="file" id="MaterialFile" accept=".json,application/json" hidden></div>
+      </aside>
+    </section>
+
+    <section id="ScriptingPane" class="AssetPane GraphPane" hidden aria-label="Scripting">
+      <section class="GraphMain">
+        <div class="GraphToolbar"><span id="ScriptRoot" class="Muted"></span><span class="HeaderSpacer"></span>
+          <span class="Muted GraphHint" data-i18n="ScriptHint">Drag Links → input to link · click a wire + Delete to unlink · double click a node to centre it</span>
+          <button class="ToolButton" id="ScriptFit" data-i18n="GraphFit">Fit (F)</button></div>
+        <div class="GraphArea" id="ScriptGraph"></div>
+        <datalist id="ScriptMessages"></datalist>
+      </section>
+      <aside class="AssetInfo GraphSide">
+        <label class="BlockLabel" for="ScriptLevel" data-i18n="ScriptLevelPick">Level (.lvl)</label>
+        <select id="ScriptLevel" class="PackageSelect"></select>
+        <label class="BlockLabel" for="ScriptFilter" data-i18n="ScriptListLabel">Entry points</label>
+        <input type="search" id="ScriptFilter" data-i18n-placeholder="ScriptFilterPlaceholder" placeholder="Filter: class or id…">
+        <label class="Check"><input type="checkbox" id="ScriptHidePaths" checked> <span data-i18n="ScriptHidePaths">Hide path nodes (Move Node Object)</span></label>
+        <button class="ToolButton" id="ScriptFromLevel" data-i18n="ScriptFromLevel">Object selected in the Level tab</button>
+        <div class="AssetCount" id="ScriptCount"></div>
+        <div id="ScriptList" class="AssetRows" role="listbox" aria-label="Scripts"></div>
+        <div class="SideActions"><span class="Muted" data-i18n="ScriptSaveNote">Saved into the .lvl</span>
+          <button class="Button Primary" id="ScriptSave" disabled data-i18n="ScriptSave">Save .lvl</button></div>
+      </aside>
+    </section>
+
+    <section id="StringsPane" class="AssetPane StringsPane" hidden aria-label="Strings">
+      <section class="StringsMain">
+        <div class="StringsToolbar">
+          <label class="BlockLabel" for="StringsPackage" data-i18n="StringsLoad">Load</label>
+          <select id="StringsPackage" class="PackageSelect"></select>
+          <input type="search" id="StringsFilter" data-i18n-placeholder="StringsFilterPlaceholder" placeholder="Filter: ref or text…">
+          <span class="AssetCount" id="StringsCount"></span>
+          <span class="HeaderSpacer"></span>
+          <span class="Muted" id="StringsChanged"></span>
+          <button class="Button" id="StringsExport" data-i18n="Export">Export</button>
+          <button class="Button" id="StringsImport" data-i18n="Import">Import</button>
+          <input type="file" id="StringsFile" accept=".tsv,.txt,text/plain" hidden>
+          <button class="Button" id="StringsRevert" disabled data-i18n="Revert">Revert</button>
+          <button class="Button Primary" id="StringsSave" disabled data-i18n="Save">Save</button>
+        </div>
+        <div class="StringsTable" id="StringsTable"></div>
+      </section>
     </section>
   </main>
 
@@ -380,13 +476,22 @@
 <script src="RiotViewport.js"></script>
 <script src="lib/TransformControls.js"></script>
 <script src="RiotShadows.js"></script>
-<script src="RiotStompPlayer.js"></script>
+<script src="RiotScreenOverlay.js"></script>
+  <script src="RiotStompPlayer.js"></script>
 <script src="RiotParticles.js"></script>
 <script src="RiotLevelView.js"></script>
 <script src="RiotGizmo.js"></script>
+<script src="RiotGltfExport.js"></script>
 <script src="RiotAssetTabs.js"></script>
+<script src="RiotAssetPicker.js"></script>
+<script src="RiotStompEdit.js"></script>
 <script src="RiotMediaTabs.js"></script>
 <script src="RiotColorPicker.js"></script>
+<script src="RiotDropMenu.js"></script>
+<script src="RiotNodeGraph.js"></script>
+<script src="RiotMaterialTab.js"></script>
+<script src="RiotScriptTab.js"></script>
+<script src="RiotStringsTab.js"></script>
 <script src="RiotEditor.js"></script>
 </body>
 </html>

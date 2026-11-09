@@ -142,6 +142,7 @@ const RiotAssetTabs = (() => {
   class ModelObject {
     constructor(Info, Buffer, TextureInfo) {
       this.Info = Info;
+      this.Source = { Info, Buffer, TextureInfo };   // PT: dados originais (exportar) / EN: original data (export)
       this.Root = new THREE.Group();
       this.Meshes = [];
       this.Materials = new MaterialFactory(TextureInfo);
@@ -237,7 +238,9 @@ const RiotAssetTabs = (() => {
             const A = Low * Stride, B = Math.min(Low + 1, KeyCount - 1) * Stride;
             const Span = Keys[B] - Keys[A];
             const U = Span > 0 ? Math.min(1, Math.max(0, (Time - Keys[A]) / Span)) : 0;
-            QA.set(Keys[A + 1], Keys[A + 2], Keys[A + 3], Keys[A + 4]); QB.set(Keys[B + 1], Keys[B + 2], Keys[B + 3], Keys[B + 4]);
+            // PT: normalizadas antes: com chaves quase iguais e norma > 1, o slerp do three.js devolvia a 1ª sem interpolar
+            // EN: normalised first: with near-equal keys of norm > 1, three.js slerp returned the first key unchanged
+            QA.set(Keys[A + 1], Keys[A + 2], Keys[A + 3], Keys[A + 4]).normalize(); QB.set(Keys[B + 1], Keys[B + 2], Keys[B + 3], Keys[B + 4]).normalize();
             Q.copy(QA).slerp(QB, U).normalize();
             if (Stride === 8) V.set(Keys[A + 5] + (Keys[B + 5] - Keys[A + 5]) * U, Keys[A + 6] + (Keys[B + 6] - Keys[A + 6]) * U, Keys[A + 7] + (Keys[B + 7] - Keys[A + 7]) * U);
             else if (Track.Rest) V.set(Track.Rest[0], Track.Rest[1], Track.Rest[2]);
@@ -690,6 +693,12 @@ const RiotAssetTabs = (() => {
       Panel.appendChild(Table([Text('ColNumber'), Text('ColMaterial'), Text('ColTexture'), Text('ColBlend')],
         Info.Groups.map((Group, Number) => ({ Cells: [String(Number), Info.Materials[Number] || '—', Group.tex || '—', Group.b || (Group.mask ? 'mask' : '—')], Click: Group.tex })),
         Code => RiotAssetTabs.OpenTexture(Code)));
+      const ExportActions = Make('div', 'InfoActions');
+      const ExportButton = Make('button', 'Small', Text('ExportGlb'));
+      ExportButton.title = Text('ExportGlbTip');
+      ExportButton.addEventListener('click', () => this.Export(Item));
+      ExportActions.appendChild(ExportButton);
+      Panel.appendChild(ExportActions);
       if (Info.Skeleton) {
         Panel.appendChild(Make('div', 'InfoHeading', Text('ModelLods')));
         Panel.appendChild(Table([Text('ColLod'), Text('ColDistance'), Text('ModelVertices'), Text('ColFaces')],
@@ -702,6 +711,18 @@ const RiotAssetTabs = (() => {
         Panel.appendChild(Actions);
       }
       Ui.SetStatus(Text('ModelStatus', { Ref: Item.Ref, Vertices: NumberText(Info.Vertices), Faces: NumberText(Info.Faces) }));
+    },
+
+    /** PT: Exporta o modelo selecionado para .glb. EN: Exports the selected model to .glb. */
+    async Export(Item) {
+      const Object_ = this.Stage.Object;
+      if (!Object_ || this.Selected !== Item) return;
+      Ui.SetStatus(Text('ExportWorking', { Ref: Item.Ref }));
+      try {
+        const Blob_ = await RiotGltfExport.Export(Object_, null, Item.Ref);
+        RiotGltfExport.Download(Blob_, `${Item.Ref}.glb`);
+        Ui.SetStatus(Text('ExportDone', { File: `${Item.Ref}.glb`, Size: NumberText(Math.round(Blob_.size / 1024)) }));
+      } catch (Error) { Ui.SetStatus(Text('ExportFailed', { Error: Error.message })); }
     },
 
     Show(Active) { if (Active) this.Open(); if (this.Stage) this.Stage.SetActive(Active); },
@@ -867,6 +888,12 @@ const RiotAssetTabs = (() => {
         [Text('AnimTracks'), Object.keys(Animation.Tracks).length],
         [Text('AnimMoving'), Object.values(Animation.Tracks).filter(Track => Track.Stride === 8).length],
       ]));
+      const ExportActions = Make('div', 'InfoActions');
+      const ExportButton = Make('button', 'Small', Text('ExportAnimGlb'));
+      ExportButton.title = Text('ExportAnimGlbTip');
+      ExportButton.addEventListener('click', () => this.Export());
+      ExportActions.appendChild(ExportButton);
+      Panel.appendChild(ExportActions);
       Panel.appendChild(Make('div', 'InfoHeading', Text('AnimEvents', { Count: Animation.Events.length })));
       if (Animation.Events.length) {
         Panel.appendChild(Table([Text('ColTime'), Text('ColType'), Text('ColCode'), Text('ColBone')], Animation.Events.map(Event => ({
@@ -888,6 +915,19 @@ const RiotAssetTabs = (() => {
       Ui.SetStatus(Text('AnimStatus', { Ref: Animation.Ref, Duration: NumberText(Animation.Duration, 2), Tracks: Object.keys(Animation.Tracks).length }));
     },
 
+    /** PT: Exporta o modelo escolhido com esta animação para .glb. EN: Exports the chosen model with this animation. */
+    async Export() {
+      const Object_ = this.Stage.Object, Animation = this.Animation;
+      if (!Object_ || !Animation || !this.ModelCode) { Ui.SetStatus(Text('AnimNoModel')); return; }
+      const FileName = `${this.ModelCode}_${Animation.Ref}.glb`;
+      Ui.SetStatus(Text('ExportWorking', { Ref: Animation.Ref }));
+      try {
+        const Blob_ = await RiotGltfExport.Export(Object_, Animation, this.ModelCode);
+        RiotGltfExport.Download(Blob_, FileName);
+        Ui.SetStatus(Text('ExportDone', { File: FileName, Size: NumberText(Math.round(Blob_.size / 1024)) }));
+      } catch (Error) { Ui.SetStatus(Text('ExportFailed', { Error: Error.message })); }
+    },
+
     Show(Active) { if (Active) this.Open(); if (this.Stage) this.Stage.SetActive(Active); },
   };
 
@@ -905,8 +945,12 @@ const RiotAssetTabs = (() => {
     },
     /** PT: Registra uma aba de outro arquivo (Áudio, STOMP, Vídeo). EN: Registers a tab from another file. */
     Register(Name, Tab) { Tabs[Name] = Tab; },
+    /** PT: A aba registrada com esse nome. EN: The tab registered under that name. */
+    Get(Name) { return Tabs[Name] || null; },
     /** PT: Ajudas compartilhadas com as outras abas. EN: Helpers shared with the other tab files. */
-    Shared: { Make, InfoGrid, Table, SplitRef, FetchModel, LoadPackages: async () => { await LoadPackages(); return Packages; }, FillPackageSelect, Remember, Ui: () => Ui },
+    Shared: { Make, InfoGrid, Table, SplitRef, FetchModel, LoadPackages: async () => { await LoadPackages(); return Packages; }, FillPackageSelect, Remember, Ui: () => Ui,
+      /** PT: Textura decodificada em ImageData (cache da aba Textures). EN: Decoded texture as ImageData. */
+      async TextureImage(Code) { const Info = await TextureTab.Fetch(Code); return Info ? TextureTab.ImageOf(Info) : null; } },
     async OpenTexture(Code) {
       Ui.SelectTab('Textures');
       await TextureTab.Open();

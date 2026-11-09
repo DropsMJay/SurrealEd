@@ -23,29 +23,22 @@ const RiotEditor = (() => {
       return Response.arrayBuffer();
     },
     NextFrame() { return new Promise(Resolve => requestAnimationFrame(() => setTimeout(Resolve, 0))); },
-    /** PT: Abre a fase da sequência e toca nela. EN: Opens the sequence's level and plays it there. */
+    /** PT: Abre a sequência na aba STOMP (visor da cena). EN: Opens the sequence in the STOMP tab (scene viewer). */
     async PlayStomp(Sequence) {
       if (!Sequence.LevelKey) { Ui.SetStatus(Text('StompNoLevel')); return; }
-      await Ui.OpenLevel(Sequence.LevelKey);
-      const Player = LevelView.Stomp;
-      if (!Player.Start(Sequence)) return;
-      $('StompBarTime').max = String(Math.max(Sequence.Duration, 0.001));
-      $('StompBarTitle').textContent = Sequence.Ref;
-      $('StompBarTitle').title = Sequence.Tracks.map(Track => Track.Name).filter(Boolean).join(', ');
-      Player.SceneCamera = $('StompBarCamera').checked;
-      Player.Sound = $('StompBarSound').checked;
-      const Missing = Player.Tracks.filter(Item => Item.Number < 0 && !Item.IsCamera).length;
-      $('StompBarNote').textContent = [Player.CameraTrack ? '' : Text('StompNoCamera'), Missing ? Text('StompMissing', { Count: Missing }) : ''].filter(Boolean).join(' · ');
-      $('StompBar').hidden = false;
-      SyncStompBar();
-      // PT: espera os personagens (modelos com esqueleto e clipes) antes de tocar / EN: wait for the characters first
-      const Note = $('StompBarNote').textContent;
-      $('StompBarNote').textContent = Text('StompLoadingRigs');
-      $('StompBarPlay').disabled = true;
-      try { await Player.Loading; } catch (Error) { /* PT: segue sem eles / EN: carry on without them */ }
-      $('StompBarPlay').disabled = false;
-      $('StompBarNote').textContent = Note;
-      if (Player.Sequence === Sequence) Player.SetPlaying(true);
+      SelectTab('STOMP');
+      const Tab = RiotAssetTabs.Get('STOMP');
+      await Tab.OpenSequence(Sequence.LevelKey, Sequence.Ref);
+      if (LevelView.Stomp.Sequence && LevelView.Stomp.Sequence.Ref === Sequence.Ref) LevelView.Stomp.SetPlaying(true);
+    },
+    /** PT: Visor e cena da fase (para a aba STOMP). EN: Level viewport and scene (for the STOMP tab). */
+    Stage() { return { Viewport, LevelView }; },
+    Levels() { return Game ? Game.Levels : []; },
+    MessageNames() { return (Game && Game.MessageNames) || {}; },
+    /** PT: Carrega uma fase sem trocar de aba. EN: Loads a level without switching tabs. */
+    async LoadLevel(Key) {
+      const Select = $('LevelSelect');
+      if (Select.value !== Key || !LevelView.Scene || LevelView.Scene.Key !== Key) { Select.value = Key; await LevelView.Load(Key); }
     },
     async OpenLevel(Key, Id, Position) {
       SelectTab('Level');
@@ -71,9 +64,10 @@ const RiotEditor = (() => {
       Info.className = 'SelectionInfo';
       Info.textContent = Description;
       Overlay.textContent = Description;
-      Overlay.hidden = false;
+      Overlay.hidden = !ViewState.Info;
     },
     LevelLoaded(Scene, Times) {
+      PlaceGrid();
       if (Times && Gizmo) { Gizmo.Reset(); ClearStructure(); $('StatusText').classList.remove('Dirty'); }
       LastTimes = Times || LastTimes;
       Times = LastTimes;
@@ -150,6 +144,36 @@ const RiotEditor = (() => {
       if (LevelView.Selected && LevelView.SelectedNumber() === Number) LevelView.Select(LevelView.Selected, false, true);
     },
     GizmoChanged() { SyncGizmoToolbar(); },
+    // ---------------------------------------------------------------- PT: para a aba Scripting / EN: for the Scripting tab
+    /** PT: Grava (na memória) uma propriedade de uma instância pelo id. EN: Records an instance property by id. */
+    SetInstanceProperty(Id, Index, Raw, OriginalRaw) {
+      const Edit = EditOf({ Id, Properties: [] });
+      Raw >>>= 0;
+      if (Raw === (OriginalRaw >>> 0)) delete Edit.Properties[Index]; else Edit.Properties[Index] = Raw;
+      Ui.RefreshDirty();
+    },
+    /** PT: Valor editado (ou undefined). EN: Edited value (or undefined). */
+    EditedProperty(Id, Index) { const Edit = LightEdits.get(Id); return Edit ? Edit.Properties[Index] : undefined; },
+    /** PT: Troca a lista de ligações de uma instância. EN: Replaces an instance's link list. */
+    SetInstanceLinks(Id, Links, Original) {
+      if (JSON.stringify(Links) === JSON.stringify(Original)) LinkEdits.delete(Id);
+      else {
+        const Number = LevelView.Scene ? LevelView.Scene.Instances.findIndex(Instance => Instance[6] === Id) : -1;
+        LinkEdits.set(Id, { Id, Number, Original: Original.slice(), Links: Links.slice() });
+      }
+      Ui.RefreshDirty();
+    },
+    EditedLinks(Id) { const Edit = LinkEdits.get(Id); return Edit ? Edit.Links.slice() : undefined; },
+    RefreshDirty() {
+      const Count = DirtyCount();
+      $('StatusText').classList.toggle('Dirty', Count > 0);
+      $('StatusText').textContent = Count > 0 ? Text('StatusModified', { Count }) : (Ui.LevelStatus || '');
+      if (Ui.OnDirty) Ui.OnDirty(Count);
+    },
+    DirtyCount() { return DirtyCount(); },
+    SaveLevel() { return SaveLevel(); },
+    GoToInstance(Id, Position) { SelectTab('Level'); GoToInstance(Id, Position || [0, 0, 0]); },
+    SelectedInstanceId() { const Number = LevelView.SelectedNumber(); return Number === null ? null : LevelView.Scene.Instances[Number][6]; },
     StructureStep(Step, Undo) { ApplyStructureStep(Step, Undo); },
     ChosenCellNode() { const Value = $('CellSelect').value; return Value === '' ? null : Value; },
   };
@@ -437,6 +461,85 @@ const RiotEditor = (() => {
     return Item;
   }
 
+  function PropFilterMode() {
+    let Mode = 'Used';
+    try { Mode = localStorage.getItem('SurrealEdPropFilter') || 'Used'; } catch (Error) { /* sem armazenamento / no storage */ }
+    return ['Used', 'Changed', 'All'].includes(Mode) ? Mode : 'Used';
+  }
+
+  /** PT: Abre a aba Scripting centrada neste objeto. EN: Opens the Scripting tab centred on this object. */
+  async function OpenInScript(Id) {
+    SelectTab('Scripting');
+    const Script = RiotAssetTabs.Get('Scripting');
+    await Script.Open();
+    if (LevelView.Scene && Script.Key !== LevelView.Scene.Key) await Script.LoadLevel(LevelView.Scene.Key);
+    if (Script.ById) await Script.FocusAny(Id);
+  }
+
+  /**
+   * PT: Toca um som (.sdu) do jogo; outro clique no mesmo para. Volume = o da aba Audio.
+   * EN: Plays a game sound; clicking the same one again stops it. Volume = the Audio tab's.
+   */
+  let SoundVoice = null, SoundRef = null;
+  function ToggleSound(Ref, OnEnd) {
+    const Same = SoundRef === Ref;
+    if (SoundVoice) { SoundVoice.pause(); if (SoundVoice.OnEnd) SoundVoice.OnEnd(); SoundVoice = null; SoundRef = null; }
+    if (Same) return false;
+    const [Package, Index] = Ref.split('_');
+    const Voice = new Audio(`/api/Sound/${Package}/${parseInt(Index, 16)}`);
+    let Volume = 0.8;
+    try { Volume = Number(localStorage.getItem('SurrealEdAudioVolume') || 0.8); } catch (Error) { /* PT: sem armazenamento / EN: no storage */ }
+    Voice.volume = Math.max(0, Math.min(1, Volume));
+    Voice.OnEnd = OnEnd;
+    Voice.addEventListener('ended', () => { if (SoundVoice === Voice) { SoundVoice = null; SoundRef = null; } if (OnEnd) OnEnd(); });
+    Voice.play().catch(() => { if (OnEnd) OnEnd(); });
+    SoundVoice = Voice; SoundRef = Ref;
+    return true;
+  }
+  Ui.ToggleSound = ToggleSound;
+
+  /** PT: Botões ▶ dos sons que o objeto usa (Sound Effect, etc.). EN: ▶ buttons for the sounds the object uses. */
+  function RenderSoundButtons(Header, Sounds) {
+    if (!Sounds || !Sounds.length) return;
+    const Row = MakeElement('div', 'PropSounds');
+    for (const Sound of Sounds) {
+      const Button = MakeElement('button', 'ToolButton PropSoundButton');
+      const Label = `${Sound.Ref} · ${NumberText(Sound.Duration, 1)} s${Sound.Loop ? ' · loop' : ''}`;
+      const Idle = () => { Button.textContent = `▶ ${Label}`; Button.classList.remove('On'); };
+      Button.title = Text('PropSoundTip', { Slot: Sound.Slot }) + (Sound.Text ? `\n“${Sound.Text}”` : '');
+      Button.addEventListener('click', () => {
+        if (ToggleSound(Sound.Ref, Idle)) { Button.textContent = `■ ${Label}`; Button.classList.add('On'); } else Idle();
+      });
+      Idle();
+      Row.appendChild(Button);
+    }
+    Header.appendChild(Row);
+  }
+
+  /**
+   * PT: Lighting Effect (ou uma Point Light animada por um): botão de prévia. Os que começam ativos (p0) já animam;
+   *     os outros só ligam no jogo por mensagem (ex.: o fim de um STOMP) — o botão liga o efeito e as luzes dele.
+   * EN: Preview toggle for a Lighting Effect or a point light driven by one.
+   */
+  function RenderLightEffectButton(Header, Details) {
+    const Effects = LevelView.LightEffectsOf ? LevelView.LightEffectsOf(Details.Id) : [];
+    if (!Effects.length) return;
+    const Button = MakeElement('button', 'ToolButton PropScriptButton');
+    const Refresh = () => {
+      const Active = Effects.some(Effect => LevelView.LightEffectActive(Effect));
+      Button.textContent = Active ? Text('LightFxStop') : Text('LightFxPlay');
+      Button.classList.toggle('On', Active);
+    };
+    Button.title = Text(Effects.every(Effect => Effect.On) ? 'LightFxTipOn' : 'LightFxTipOff');
+    Button.addEventListener('click', () => {
+      const Active = Effects.some(Effect => LevelView.LightEffectActive(Effect));
+      for (const Effect of Effects) LevelView.SetLightEffectForced(Effect, !Active);
+      Refresh();
+    });
+    Refresh();
+    Header.appendChild(Button);
+  }
+
   function RenderProperties(Details) {
     const Panel = $('PropertiesPanel');
     Panel.innerHTML = '';
@@ -444,9 +547,17 @@ const RiotEditor = (() => {
     Header.appendChild(MakeElement('b', null, Details.CopyOf ? `${Details.Class} · ${Text('PropNewCopy', { Id: Details.CopyOf })}` : `${Details.Class} · #${Details.Id}`));
     Header.appendChild(MakeElement('div', null, `${Text('PropTemplate')} ${Details.Template} · ${Text('PropModel')} ${Details.Model} · ${Details.ClassId || ''}`));
     Header.appendChild(MakeElement('div', null, `${Text('PropBaked')} ${Details.BakedLight} · ${Text('PropLinks')} ${Details.Links.length}`));
+    if (!Details.CopyOf) {
+      const ScriptButton = MakeElement('button', 'ToolButton PropScriptButton', Text('PropOpenScript'));
+      ScriptButton.title = Text('PropOpenScriptTip');
+      ScriptButton.addEventListener('click', () => OpenInScript(Details.Id));
+      Header.appendChild(ScriptButton);
+      RenderLightEffectButton(Header, Details);
+      RenderSoundButtons(Header, Details.Sounds);
+    }
     Panel.appendChild(Header);
 
-    Panel.appendChild(MakeElement('div', 'PropGroupTitle', Text('PropTransform')));
+    Panel.appendChild(GroupTitle('Transform', Text('PropTransform')));
     const Grid = MakeElement('div', 'TransformGrid');
     const Row = (Label, Values, Digits, Kind) => {
       Grid.appendChild(MakeElement('span', null, Label));
@@ -468,7 +579,8 @@ const RiotEditor = (() => {
     const InstanceNumber = LevelView.Scene ? LevelView.Scene.Instances.findIndex(Instance => Instance[6] === Details.Id) : -1;
     if (InstanceNumber >= 0 && Gizmo.Modified.has(InstanceNumber)) UpdateTransformFields(InstanceNumber, LevelView.Scene.Instances[InstanceNumber]);
 
-    Panel.appendChild(MakeElement('div', 'PropGroupTitle', `${Text('PropFlags')} · ${Details.Flags}`));
+    RenderModelSection(Panel, Details, InstanceNumber);
+    Panel.appendChild(GroupTitle('Flags', `${Text('PropFlags')} · ${Details.Flags}`));
     const Flags = MakeElement('div', 'FlagList');
     const Editable = InstanceNumber >= 0 && LevelView.Scene.Instances[InstanceNumber][0] !== 'terrain';
     const Current = CurrentFlags(InstanceNumber, Details);
@@ -499,20 +611,29 @@ const RiotEditor = (() => {
     if (Details.UnknownFlags) Panel.appendChild(MakeElement('p', 'Note', Text('PropUnknownFlags', { Bits: Details.UnknownFlags })));
     Panel.appendChild(MakeElement('p', 'Note', Text('PropUnconfirmed')));
 
-    Panel.appendChild(MakeElement('div', 'PropGroupTitle', `${Text('PropProperties')} · ${Details.OverrideCount}/${Details.Properties.length}`));
+    Panel.appendChild(GroupTitle('Properties', `${Text('PropProperties')} · ${Details.OverrideCount}/${Details.Properties.length}`));
+    // PT: filtro: "usadas" = lidas pelo código (lista incompleta), com nome, de mensagem ou alteradas aqui
+    // EN: filter: "used" = read by the code (incomplete list), named, message slot or changed here
+    const Edited = LightEdits.get(Details.Id);
+    const Used = Property => Property.Read || Property.Pt || Property.Slot || Property.Overridden || Boolean(Edited && Edited.Properties[Property.Index] !== undefined);
+    const Mode = PropFilterMode();
+    const Shows = Property => Mode === 'All' || (Mode === 'Changed' ? Property.Overridden : Used(Property));
     const Filter = MakeElement('label', 'PropFilter');
-    const OnlyBox = document.createElement('input');
-    OnlyBox.type = 'checkbox'; OnlyBox.checked = !!Ui.OnlyOverridden;
-    OnlyBox.addEventListener('change', () => { Ui.OnlyOverridden = OnlyBox.checked; RenderProperties(Details); });
-    Filter.append(OnlyBox, MakeElement('span', null, Text('PropOnlyOverridden')));
+    const Select = document.createElement('select');
+    for (const Option_ of ['Used', 'Changed', 'All']) Select.add(new Option(Text('PropFilter' + Option_), Option_));
+    Select.value = Mode;
+    Select.addEventListener('change', () => { try { localStorage.setItem('SurrealEdPropFilter', Select.value); } catch (Error) { /* sem armazenamento */ } RenderProperties(Details); });
+    Filter.append(MakeElement('span', null, Text('PropFilterLabel')), Select);
     Panel.appendChild(Filter);
+    const HiddenCount = Details.Properties.filter(Property => !Shows(Property)).length;
+    if (Mode === 'Used' && HiddenCount) Panel.appendChild(MakeElement('p', 'Note', Text('PropFilterHidden', { Count: HiddenCount })));
     const Table = MakeElement('table', 'PropTable');
     const Head = MakeElement('tr');
     for (const Key of ['PropIndex', 'PropType', 'PropValue']) Head.appendChild(MakeElement('th', null, Text(Key)));
     const HeadSection = document.createElement('thead'); HeadSection.appendChild(Head); Table.appendChild(HeadSection);
     const Body = document.createElement('tbody');
     for (const Property of Details.Properties) {
-      if (Ui.OnlyOverridden && !Property.Overridden) continue;
+      if (!Shows(Property)) continue;
       const Line = MakeElement('tr', Property.Overridden ? 'Overridden' : '');
       Line.appendChild(MakeElement('td', 'Index', String(Property.Index)));
       Line.appendChild(MakeElement('td', 'Type', Property.TypeName));
@@ -538,6 +659,141 @@ const RiotEditor = (() => {
     Panel.appendChild(Table);
     Panel.appendChild(MakeElement('p', 'Note', Text('PropReadOnly')));
     RenderLinks(Panel, Details);
+    WrapGroups(Panel);
+  }
+
+  // ------------------------------------------------------------------ grupos que abrem e fecham / collapsible groups
+  function GroupTitle(Key, Title) { const Element = MakeElement('div', 'PropGroupTitle', Title); Element.dataset.group = Key; return Element; }
+
+  function GroupState() { try { return JSON.parse(localStorage.getItem('SurrealEdGroups') || '{}'); } catch (Error) { return {}; } }
+
+  /**
+   * PT: Cada título de grupo vira um <details> com seta; o que vem depois dele (até o próximo título) fica dentro.
+   *     Aberto/fechado fica guardado por grupo.
+   * EN: Every group title becomes a <details> with an arrow holding what follows it; open state remembered per group.
+   */
+  function WrapGroups(Panel) {
+    const State = GroupState();
+    let Current = null;
+    for (const Child of [...Panel.children]) {
+      if (Child.classList.contains('PropGroupTitle') && Child.dataset.group) {
+        const Key = Child.dataset.group;
+        Current = document.createElement('details');
+        Current.className = 'PropGroup';
+        Current.open = State[Key] !== false;
+        const Summary = document.createElement('summary');
+        Summary.className = 'PropGroupTitle';
+        Summary.append(...Child.childNodes);
+        Current.appendChild(Summary);
+        Current.addEventListener('toggle', () => { const Now = GroupState(); Now[Key] = Current.open; try { localStorage.setItem('SurrealEdGroups', JSON.stringify(Now)); } catch (Error) { /* sem armazenamento */ } });
+        Child.replaceWith(Current);
+        continue;
+      }
+      if (Current) Current.appendChild(Child);
+    }
+  }
+
+  // ------------------------------------------------------------------ Modelo e materiais / model and materials
+  /**
+   * PT: Seções no estilo do Unreal. Modelo: por objeto (bloco "modelo próprio" do .lvl, aplicado ao salvar; o objeto
+   *     perde a luz .ldu, que é do modelo antigo). Materiais: pertencem ao MODELO (.mdu), então trocar vale para todo
+   *     objeto que usa o modelo, em todas as fases; grava na hora.
+   * EN: Unreal-style sections. Model: per object (own-model block, applied on save). Materials belong to the model.
+   */
+  function RenderModelSection(Panel, Details, InstanceNumber) {
+    const Info = Details.ModelInfo;
+    if (!Info || Details.CopyOf || InstanceNumber < 0) return;
+    const Pending = ModelEdits.get(InstanceNumber);
+    const Current = Pending ? Pending.Model : Info.Model;
+    Panel.appendChild(GroupTitle('Model', Text('PropModelTitle')));
+    const Row = MakeElement('div', 'AssetRowEdit' + (Pending ? ' Edited' : ''));
+    Row.appendChild(RiotAssetPicker.ThumbImage(RiotAssetPicker.ModelThumb(Current), 'AssetThumb Large'));
+    const Column = MakeElement('div', 'AssetRowColumn');
+    const Pick = MakeElement('button', 'AssetField', `${Current || '—'} ▾`);
+    Pick.title = Text('PropModelPick');
+    Pick.addEventListener('click', () => RiotAssetPicker.Open(Pick, 'model', Current, Ref => SetInstanceModel(InstanceNumber, Details, Ref)));
+    const Buttons = MakeElement('div', 'AssetButtons');
+    const Reset = MakeElement('button', 'ToolButton', '↺');
+    Reset.title = Text('PropModelReset', { Ref: Info.Template || '—' });
+    Reset.disabled = !Info.Template || Current === Info.Template;
+    Reset.addEventListener('click', () => SetInstanceModel(InstanceNumber, Details, Info.Template));
+    const Browse = MakeElement('button', 'ToolButton', '→');
+    Browse.title = Text('PropModelBrowse');
+    Browse.disabled = !Current;
+    Browse.addEventListener('click', () => OpenModelTab(Current));
+    Buttons.append(Reset, Browse);
+    Column.append(Pick, MakeElement('small', null, Text(Info.Own ? 'PropModelOwn' : 'PropModelFromTemplate', { Ref: Info.Template || '—' })), Buttons);
+    Row.appendChild(Column);
+    Panel.appendChild(Row);
+    if (Pending) Panel.appendChild(MakeElement('p', 'Note', Text('PropModelPending')));
+
+    Panel.appendChild(GroupTitle('Materials', `${Text('PropMaterialsTitle')} · ${Info.Materials.length}`));
+    if (Pending) { Panel.appendChild(MakeElement('p', 'Note', Text('PropMaterialsAfterSave'))); return; }
+    for (const Material of Info.Materials) {
+      const Line = MakeElement('div', 'AssetRowEdit');
+      Line.appendChild(RiotAssetPicker.ThumbImage(RiotAssetPicker.TextureThumb(Material.Texture), 'AssetThumb'));
+      const Cell = MakeElement('div', 'AssetRowColumn');
+      const Field = MakeElement('button', 'AssetField', `${Material.Ref || '—'} ▾`);
+      Field.addEventListener('click', () => RiotAssetPicker.Open(Field, 'material', Material.Ref, Ref => SetModelMaterial(Info.Model, Material.Slot, Ref, Details.Id)));
+      const Open = MakeElement('button', 'ToolButton', '→');
+      Open.title = Text('PropMaterialOpen');
+      Open.disabled = !Material.Ref;
+      Open.addEventListener('click', async () => { SelectTab('Material'); const Tab = RiotAssetTabs.Get('Material'); await Tab.Open(); await Tab.OpenRef(Material.Ref); });
+      const Head = MakeElement('div', 'AssetButtons');
+      Head.append(MakeElement('span', 'AssetSlot', Text('PropMaterialSlot', { Slot: Material.Slot })), Open);
+      Cell.append(Head, Field, MakeElement('small', null, `${Material.Texture || '—'} · ${Material.Blend || ''}`));
+      Line.appendChild(Cell);
+      Panel.appendChild(Line);
+    }
+    Panel.appendChild(MakeElement('p', 'Note', Text('PropMaterialsShared', { Ref: Info.Model || '—' })));
+  }
+
+  function SetInstanceModel(Number, Details, Ref) {
+    if (!Ref) return;
+    if (Ref === Details.ModelInfo.Model) ModelEdits.delete(Number);
+    else ModelEdits.set(Number, { Id: Details.Id, Number, Model: Ref });
+    Ui.RefreshDirty();
+    RenderProperties(Details);
+  }
+
+  async function SetModelMaterial(Model, Slot, Ref, SelectId) {
+    if (!Model || !Ref) return;
+    if (DirtyCount() && !window.confirm(Text('PropMaterialUnsaved'))) return;
+    if (!window.confirm(Text('PropMaterialConfirm', { Model, Slot, Ref }))) return;
+    const [Package, Index] = Model.split('_');
+    let Result;
+    try {
+      const Response = await fetch(`/api/SetModelMaterial/${Package}/0x${Index}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ Slot, Material: Ref }) });
+      Result = await Response.json();
+    } catch (Error) { Result = { Error: String(Error) }; }
+    if (Result.Error) { Ui.SetStatus(Text('SaveFailed', { Error: Result.Error })); return; }
+    Ui.SetStatus(Text('LevelReloading'));
+    await ReloadKeepingView(SelectId);
+    Ui.SetStatus(Result.Saved ? Text('PropMaterialSaved', { Model, Slot, Ref, Backup: Result.Backup || '—' }) : Text('SaveNothing'));
+  }
+
+  /** PT: Recarrega a fase mantendo a câmera e reseleciona um objeto. EN: Reloads the level keeping the view. */
+  async function ReloadKeepingView(SelectId) {
+    const Scene = LevelView.Scene;
+    if (!Scene) return;
+    const Camera = Viewport.Camera, Forward = new THREE.Vector3();
+    Camera.getWorldDirection(Forward);
+    const View = [Camera.position.clone(), Camera.position.clone().add(Forward.multiplyScalar(5))];
+    FlagEdits.clear(); LightEdits.clear(); LinkEdits.clear(); ModelEdits.clear(); ClearStructure();
+    await LevelView.Load(Scene.Key, { View });
+    const Number = SelectId !== undefined ? LevelView.Scene.Instances.findIndex(Instance => Instance[6] === SelectId) : -1;
+    if (Number >= 0) { SelectNumber(Number); await Ui.ShowProperties(Scene.Key, SelectId); }
+    Ui.RefreshDirty();
+  }
+
+  async function OpenModelTab(Code) {
+    SelectTab('Models');
+    const Tab = RiotAssetTabs.Get('Models');
+    await Tab.Open();
+    const Package = Code.split('_')[0];
+    if ($('ModelPackage').value !== Package) { $('ModelPackage').value = Package; await Tab.LoadPackage(); }
+    const Item = Tab.List.find(Entry => Entry.Ref === Code);
+    if (Item) await Tab.Select(Item);
   }
 
   /**
@@ -547,7 +803,7 @@ const RiotEditor = (() => {
    */
   function RenderLinks(Panel, Details) {
     if (!Details.LinkOut) return;
-    Panel.appendChild(MakeElement('div', 'PropGroupTitle', `${Text('LinksTitle')} · ${Details.LinkOut.length} ⟶ · ⟵ ${Details.LinkIn.length}`));
+    Panel.appendChild(GroupTitle('Links', `${Text('LinksTitle')} · ${Details.LinkOut.length} ⟶ · ⟵ ${Details.LinkIn.length}`));
     if (Details.Outputs && Details.Outputs.length)
       Panel.appendChild(MakeElement('p', 'LinkSends', Text('LinksSends', { List: Details.Outputs.map(Output => `p${Output.Property} = ${Output.Message}${Output.Name ? ' ' + Output.Name : ''}`).join(' · ') })));
     if (Details.FixedInputs && Details.FixedInputs.length)
@@ -600,7 +856,181 @@ const RiotEditor = (() => {
 
   function SyncGizmoToolbar() {
     for (const Button of document.querySelectorAll('[data-gizmo]')) Button.setAttribute('aria-pressed', String(Button.dataset.gizmo === Gizmo.Mode));
-    $('GizmoSpace').textContent = Text(Gizmo.Space === 'world' ? 'SpaceWorld' : 'SpaceLocal');
+    $('GizmoSpace').dataset.tip = Gizmo.Space === 'world' ? 'SpaceWorld' : 'SpaceLocal';
+    $('GizmoSpace').setAttribute('aria-pressed', String(Gizmo.Space === 'local'));
+    // PT: dicas dos ícones do cabeçalho (refeitas ao trocar de idioma) / EN: header icon tooltips
+    for (const Element of document.querySelectorAll('#ViewHeader [data-tip]')) {
+      const Tip = Text(Element.dataset.tip) + (Element.dataset.key ? ` (${Element.dataset.key})` : '');
+      Element.title = Tip;
+      Element.setAttribute('aria-label', Tip);
+    }
+    if (typeof UpdateViewPill === 'function') UpdateViewPill();
+  }
+
+  // ------------------------------------------------------------------ cabeçalho do visor / viewport header
+  // PT: Ferramentas, menus Transform e View (no estilo do Blender) e a "pílula" com o nome da vista. As escolhas de
+  //     exibição ficam gravadas no navegador.
+  // EN: Tools, Transform and View menus (Blender-style) and the view-name pill. Display choices persist per browser.
+  const ViewState = { Display: 'Normal', AutoOrtho: true, Grid: false, Info: false, FrameTime: false, Name: 'User', AutoOrthoOn: false };
+  let ViewMenu = null;
+
+  function SaveViewState() {
+    try {
+      localStorage.setItem('SurrealEdView', JSON.stringify({ Display: ViewState.Display, AutoOrtho: ViewState.AutoOrtho, Grid: ViewState.Grid, Info: ViewState.Info, FrameTime: ViewState.FrameTime }));
+    } catch (Error) { /* sem armazenamento / no storage */ }
+  }
+
+  function UpdateViewPill() {
+    if (!Viewport) return;
+    const Projection = Text(Viewport.Orthographic ? 'ViewOrthographic' : 'ViewPerspective');
+    $('ViewPillText').textContent = ViewState.Name === 'User' ? Projection : `${Text('View' + ViewState.Name)} · ${Projection}`;
+  }
+
+  function SetDisplay(Mode) {
+    ViewState.Display = Mode;
+    Viewport.RenderMode.Display = Mode;
+    Viewport.RenderMode.Textured = true;
+    Viewport.RenderMode.Wireframe = false;
+    Viewport.ApplyRenderMode();
+    SaveViewState();
+  }
+
+  function SetAxisView(Name) {
+    Viewport.Controls.SetAxisView(Name);
+    ViewState.Name = Name;
+    if (ViewState.AutoOrtho && !Viewport.Orthographic) { ViewState.AutoOrthoOn = true; Viewport.SetOrthographic(true); }
+    UpdateViewPill();
+  }
+
+  function SetOrtho(On) {
+    ViewState.AutoOrthoOn = false;
+    Viewport.SetOrthographic(On);
+    UpdateViewPill();
+  }
+
+  function SetCheck(Id, Value) {
+    const Box = $(Id);
+    if (Box.checked === Value) return;
+    Box.checked = Value;
+    Box.dispatchEvent(new Event('change'));
+  }
+
+  function PlaceGrid() {
+    if (!LevelView.Scene) return;
+    const Center = LevelView.Center, Size = LevelView.Size;
+    Viewport.Grid.position.set(Math.round(Center.x), Center.y - Size.y / 2, Math.round(Center.z));
+  }
+
+  function SetViewInfo(On) {
+    ViewState.Info = On;
+    $('InfoOverlay').hidden = !On;
+    $('SelectionOverlay').hidden = !On || !$('SelectionOverlay').textContent;
+    SaveViewState();
+  }
+
+  function FocusOrigin() {
+    const Forward = Viewport.Controls.Forward();
+    Viewport.SetView(new THREE.Vector3().addScaledVector(Forward, -Math.max(Viewport.Controls.FocusDistance, 5)), new THREE.Vector3());
+  }
+
+  function AlignToView(WithPosition) {
+    if (!Gizmo.AlignToView(Viewport.Camera, WithPosition)) Ui.SetStatus(Text('AlignNothing'));
+  }
+
+  function TransformMenuItems() {
+    const Mode = (Name, Label, Key) => ({ Kind: 'radio', Label: Text(Label), Key, Checked: () => Gizmo.Mode === Name, Run: () => Gizmo.SetMode(Name) });
+    const Nothing = () => LevelView.SelectedNumber() === null;
+    return [
+      Mode('select', 'GizmoSelect', 'Q'), Mode('translate', 'GizmoMove', 'W'), Mode('rotate', 'GizmoRotate', 'E'), Mode('scale', 'GizmoScale', 'R'),
+      { Kind: 'sep' },
+      { Kind: 'radio', Label: Text('SpaceWorld'), Key: '`', Checked: () => Gizmo.Space === 'world', Run: () => { if (Gizmo.Space !== 'world') Gizmo.ToggleSpace(); } },
+      { Kind: 'radio', Label: Text('SpaceLocal'), Key: '`', Checked: () => Gizmo.Space === 'local', Run: () => { if (Gizmo.Space !== 'local') Gizmo.ToggleSpace(); } },
+      { Kind: 'sep' },
+      { Label: Text('ActionCopy'), Key: 'Ctrl+C', Disabled: Nothing, Run: () => RunAction('Copy') },
+      { Label: Text('ActionPaste'), Key: 'Ctrl+V', Run: () => RunAction('Paste') },
+      { Label: Text('ActionDuplicate'), Key: 'Ctrl+D', Disabled: Nothing, Run: () => RunAction('Duplicate') },
+      { Label: Text('ActionDelete'), Key: 'Del', Disabled: Nothing, Run: () => RunAction('Delete') },
+      { Kind: 'sep' },
+      { Label: Text('ActionUndo'), Key: 'Ctrl+Z', Disabled: () => !Gizmo.UndoStack.length, Run: () => Gizmo.Undo() },
+      { Label: Text('ActionRedo'), Key: 'Ctrl+Y', Disabled: () => !Gizmo.RedoStack.length, Run: () => Gizmo.Redo() },
+      { Kind: 'sep' },
+      { Label: Text('AlignTransform'), Key: 'Ctrl+Alt+Kp 0', Disabled: Nothing, Run: () => AlignToView(true) },
+      { Label: Text('AlignRotation'), Key: 'Ctrl+Alt+F', Disabled: Nothing, Run: () => AlignToView(false) },
+    ];
+  }
+
+  function ViewMenuItems() {
+    const Axis = (Name, Key) => ({ Label: Text('View' + Name + 'Item'), Key, Run: () => SetAxisView(Name) });
+    const Display = (Mode, Label) => ({ Kind: 'radio', Label: Text(Label), Checked: () => ViewState.Display === Mode, Run: () => SetDisplay(Mode) });
+    const Check = (Label, Checked, Run, Key, Extra) => Object.assign({ Kind: 'check', Label: Text(Label), Key, Checked, Run }, Extra || {});
+    return [
+      Axis('Top', 'Kp 7'), Axis('Bottom', 'Alt+Kp 7'), Axis('Left', 'Alt+Kp 3'), Axis('Right', 'Kp 3'), Axis('Front', 'Kp 1'), Axis('Rear', 'Alt+Kp 1'),
+      { Kind: 'sep' },
+      { Label: Text('ViewSwitchProjection'), Key: 'Kp 5', Run: () => SetOrtho(!Viewport.Orthographic) },
+      { Kind: 'radio', Label: Text('ViewPerspective'), Checked: () => !Viewport.Orthographic, Run: () => SetOrtho(false) },
+      { Kind: 'radio', Label: Text('ViewOrthographic'), Checked: () => Viewport.Orthographic, Run: () => SetOrtho(true) },
+      Check('ViewAutoOrtho', () => ViewState.AutoOrtho, () => { ViewState.AutoOrtho = !ViewState.AutoOrtho; SaveViewState(); }, null, { Tip: Text('ViewAutoOrthoTip') }),
+      { Kind: 'sep' },
+      Check('ViewLockRotation', () => Viewport.Controls.LockRotation, () => { Viewport.Controls.LockRotation = !Viewport.Controls.LockRotation; }),
+      { Kind: 'sep' },
+      Display('Normal', 'DisplayNormal'), Display('Wireframe', 'DisplayWireframe'),
+      Display('Lighting', 'DisplayLighting'), Display('Unshaded', 'DisplayUnshaded'),
+      { Label: Text('DisplayAdvancedItem'), Key: '›', Run: () => { $('RenderOverlay').hidden = false; } },
+      { Kind: 'sep' },
+      Check('ViewEnvironment', () => $('RenderSky').checked, () => { const On = !$('RenderSky').checked; SetCheck('RenderSky', On); SetCheck('RenderFog', On); }, null, { Tip: Text('ViewEnvironmentTip') }),
+      Check('ViewGizmos', () => $('RenderLightIcons').checked, () => SetCheck('RenderLightIcons', !$('RenderLightIcons').checked)),
+      Check('ViewTransformGizmo', () => Gizmo.Shown, () => { Gizmo.Shown = !Gizmo.Shown; Gizmo.ApplySettings(); }),
+      Check('ViewGrid', () => Viewport.Grid.visible, () => { Viewport.Grid.visible = !Viewport.Grid.visible; ViewState.Grid = Viewport.Grid.visible; PlaceGrid(); SaveViewState(); }),
+      Check('ViewInformation', () => ViewState.Info, () => SetViewInfo(!ViewState.Info)),
+      Check('ViewFrameTime', () => ViewState.FrameTime, () => { ViewState.FrameTime = !ViewState.FrameTime; $('HeaderStats').hidden = !ViewState.FrameTime; SaveViewState(); }),
+      { Kind: 'sep' },
+      Check('ViewHalfResolution', () => Viewport.ResolutionScale <= 0.5, () => { const Scale = Viewport.ResolutionScale <= 0.5 ? 1 : 0.5; Viewport.SetResolution(Scale); $('Resolution').value = String(Scale); }),
+      { Kind: 'sep' },
+      { Label: Text('ViewFocusOrigin'), Key: 'O', Run: FocusOrigin },
+      { Label: Text('ActionFocusSelection'), Key: 'F', Disabled: () => LevelView.SelectedNumber() === null, Run: () => LevelView.FocusSelection() },
+      { Label: Text('AlignTransform'), Key: 'Ctrl+Alt+Kp 0', Disabled: () => LevelView.SelectedNumber() === null, Run: () => AlignToView(true) },
+      { Label: Text('AlignRotation'), Key: 'Ctrl+Alt+F', Disabled: () => LevelView.SelectedNumber() === null, Run: () => AlignToView(false) },
+    ];
+  }
+
+  /** PT: Atalhos do teclado numérico e do menu View. EN: Numpad and View menu shortcuts. */
+  function ViewShortcut(Event) {
+    const Code = Event.code;
+    if ((Event.ctrlKey || Event.metaKey) && Event.altKey && Code === 'Numpad0') { Event.preventDefault(); AlignToView(true); return true; }
+    if ((Event.ctrlKey || Event.metaKey) && Event.altKey && Event.key.toLowerCase() === 'f') { Event.preventDefault(); AlignToView(false); return true; }
+    if (Event.ctrlKey || Event.metaKey) return false;
+    const Axis = { Numpad7: Event.altKey ? 'Bottom' : 'Top', Numpad1: Event.altKey ? 'Rear' : 'Front', Numpad3: Event.altKey ? 'Left' : 'Right' }[Code];
+    if (Axis) { Event.preventDefault(); SetAxisView(Axis); return true; }
+    if (Code === 'Numpad5') { Event.preventDefault(); SetOrtho(!Viewport.Orthographic); return true; }
+    if (!Event.altKey && !(Viewport.Controls.Buttons & 2) && Event.key.toLowerCase() === 'o') { FocusOrigin(); return true; }
+    return false;
+  }
+
+  function SetupViewHeader() {
+    ViewMenu = new RiotDropMenu($('ViewDropMenu'));
+    try { Object.assign(ViewState, JSON.parse(localStorage.getItem('SurrealEdView') || '{}')); } catch (Error) { /* ignora / ignore */ }
+    for (const Button of [$('TransformMenuButton'), $('ViewPill')]) Button.setAttribute('aria-haspopup', 'true');
+    $('TransformMenuButton').addEventListener('click', () => ViewMenu.Toggle($('TransformMenuButton'), TransformMenuItems));
+    $('ViewPill').addEventListener('click', () => ViewMenu.Toggle($('ViewPill'), ViewMenuItems));
+    $('KeysButton').addEventListener('click', () => { $('KeysOverlay').hidden = !$('KeysOverlay').hidden; $('KeysButton').setAttribute('aria-pressed', String(!$('KeysOverlay').hidden)); });
+    $('RenderOverlayClose').addEventListener('click', () => { $('RenderOverlay').hidden = true; });
+    Viewport.Controls.OnRotate = () => {
+      if (ViewState.Name === 'User' && !ViewState.AutoOrthoOn) return;
+      ViewState.Name = 'User';
+      if (ViewState.AutoOrthoOn) { ViewState.AutoOrthoOn = false; Viewport.SetOrthographic(false); }
+      UpdateViewPill();
+    };
+    Viewport.OnCameraChange = Camera => { Gizmo.Controls.camera = Camera; UpdateViewPill(); };
+    const Stats = Viewport.OnStats;
+    Viewport.OnStats = Value => {
+      if (Stats) Stats(Value);
+      if (ViewState.FrameTime) $('HeaderStats').textContent = Text('HeaderStats', { Fps: Value.Fps.toFixed(0), Ms: (Value.Fps ? 1000 / Value.Fps : 0).toFixed(1) });
+    };
+    SetDisplay(['Normal', 'Wireframe', 'Lighting', 'Unshaded'].includes(ViewState.Display) ? ViewState.Display : 'Normal');
+    Viewport.Grid.visible = Boolean(ViewState.Grid);
+    SetViewInfo(Boolean(ViewState.Info));
+    $('HeaderStats').hidden = !ViewState.FrameTime;
+    UpdateViewPill();
   }
 
   function FillClasses() {
@@ -663,8 +1093,6 @@ const RiotEditor = (() => {
   }
 
   function SyncRenderMode() {
-    Viewport.RenderMode.Textured = document.querySelector('input[name=RenderMode]:checked').value === 'Textured';
-    Viewport.RenderMode.Wireframe = $('RenderWireframe').checked;
     Viewport.ApplyRenderMode();
     LevelView.ShowNormals($('RenderNormals').checked);
   }
@@ -676,7 +1104,7 @@ const RiotEditor = (() => {
     $('Workspace').classList.toggle('AssetMode', IsAsset);
     $('Placeholder').hidden = IsLevel || IsAsset;
     $('SidePanel').style.visibility = IsLevel ? 'visible' : 'hidden';
-    if (Viewport) Viewport.Active = !IsAsset;
+    if (Viewport) Viewport.Active = !IsAsset || Name === 'STOMP';   // PT: a aba STOMP usa o visor da fase / EN: STOMP uses the level viewport
     RiotAssetTabs.Show(IsAsset ? Name : null);
     if (IsLevel) $('StatusText').textContent = Ui.LevelStatus || '';
     if (!IsLevel && !IsAsset) {
@@ -854,7 +1282,7 @@ const RiotEditor = (() => {
    */
   function RenderLightEditor(Panel, Details) {
     const Light = LevelView.LightOf(Details.Id);
-    Panel.appendChild(MakeElement('div', 'PropGroupTitle', Text('LightEditTitle')));
+    Panel.appendChild(GroupTitle('Light', Text('LightEditTitle')));
     const Box = MakeElement('div', 'LightEditor');
     LightPicker = new RiotColorPicker(Box, {
       Color: Light.slice(3, 6), Labels: { Old: Text('ColorOld'), New: Text('ColorNew'), Restore: Text('ColorRestore') },
@@ -884,6 +1312,9 @@ const RiotEditor = (() => {
   }
 
   // ------------------------------------------------------------------ edição e gravação / editing and saving
+  // PT: ligações editadas na aba Scripting: id -> {Id, Number, Original, Links} / EN: links edited in the Scripting tab
+  const LinkEdits = new Map();
+  const ModelEdits = new Map();    // PT: nº da instância -> {Id, Number, Model} / EN: instance number -> new model
   const FlagEdits = new Map();      // PT: instância -> {Original, Flags} / EN: instance -> {Original, Flags}
 
   function CurrentFlags(Number, Details) {
@@ -913,6 +1344,8 @@ const RiotEditor = (() => {
     if (Gizmo) for (const [Number, Original] of Gizmo.Modified) if (JSON.stringify(Gizmo.Values(Number)) !== JSON.stringify(Original)) Dirty.add(Number);
     for (const [Number] of FlagEdits) Dirty.add(Number);
     for (const Edit of LightEdits.values()) if (Object.keys(Edit.Properties).length) Dirty.add(Edit.Number >= 0 ? Edit.Number : 'id' + Edit.Id);
+    for (const Edit of LinkEdits.values()) Dirty.add(Edit.Number >= 0 ? Edit.Number : 'id' + Edit.Id);
+    for (const Number of ModelEdits.keys()) Dirty.add(Number);
     for (const Number of Structure.Added.keys()) Dirty.add(Number);
     for (const Number of Structure.Removed) if (Structure.Added.has(Number)) Dirty.delete(Number); else Dirty.add(Number);
     return Dirty.size;
@@ -928,6 +1361,7 @@ const RiotEditor = (() => {
   window.addEventListener('blur', () => { MouseButtons = 0; });
 
   function AssetShortcut(Event) {
+    if (CurrentTab === 'Textures') return TextureShortcut(Event);
     const Entry = AssetLists[CurrentTab];
     if (!Entry || Event.ctrlKey || Event.metaKey || Event.altKey || MouseButtons) return false;
     const [ListId, PlayId] = Entry, Key = Event.key.toLowerCase();
@@ -952,12 +1386,47 @@ const RiotEditor = (() => {
     return false;
   }
 
+  /**
+   * PT: Aba Texturas: a lista é uma grade, então W/S (ou setas cima/baixo) andam uma linha e A/D (ou setas
+   *     esquerda/direita) um quadro. As colunas são contadas pelo layout atual (quadros na mesma altura).
+   * EN: Textures tab: the list is a grid, so W/S move one row and A/D one tile; columns come from the current layout.
+   */
+  function TextureShortcut(Event) {
+    if (Event.ctrlKey || Event.metaKey || Event.altKey || MouseButtons) return false;
+    const Key = Event.key.toLowerCase();
+    const Moves = { w: 'up', arrowup: 'up', s: 'down', arrowdown: 'down', a: 'left', arrowleft: 'left', d: 'right', arrowright: 'right' };
+    if (!Moves[Key]) return false;
+    const Tiles = [...document.querySelectorAll('#TexGrid .TexTile')];
+    if (!Tiles.length) return true;
+    Event.preventDefault();
+    const Top = Tiles[0].offsetTop;
+    let Columns = Tiles.findIndex(Tile => Tile.offsetTop !== Top);
+    if (Columns < 1) Columns = Tiles.length;
+    const Current = Tiles.findIndex(Tile => Tile.getAttribute('aria-selected') === 'true');
+    const Step = { up: -Columns, down: Columns, left: -1, right: 1 }[Moves[Key]];
+    const Next = Current < 0 ? 0 : Current + Step;
+    if (Next < 0 || Next >= Tiles.length || Next === Current) return true;
+    Tiles[Next].click();
+    // PT: o foco vai junto, senão o contorno de foco fica no ladrilho anterior / EN: move focus too (focus ring)
+    if (Tiles.includes(document.activeElement)) Tiles[Next].focus({ preventScroll: true });
+    Tiles[Next].scrollIntoView({ block: 'nearest' });
+    return true;
+  }
+
   // ------------------------------------------------------------------ STOMP na fase / STOMP in the level
   function SyncStompBar() {
     const Player = LevelView.Stomp;
     $('ViewportArea').classList.toggle('StompMode', Player.Active);
     if (!Player.Active) { $('StompBar').hidden = true; $('StompSubtitle').hidden = true; return; }
     const Duration = Math.max(Player.Sequence.Duration, 0.001);
+    if ($('StompBar').hidden || $('StompBarTitle').textContent !== Player.Sequence.Ref) {
+      $('StompBarTime').max = String(Duration);
+      $('StompBarTitle').textContent = Player.Sequence.Ref;
+      $('StompBarTitle').title = Player.Sequence.Tracks.map(Track => Track.Name).filter(Boolean).join(', ');
+      $('StompBarCamera').checked = Player.SceneCamera;
+      $('StompBarSound').checked = Player.Sound;
+      $('StompBar').hidden = false;
+    }
     $('StompBarPlay').textContent = Text(Player.Playing ? 'AnimPause' : 'AnimPlay');
     if (document.activeElement !== $('StompBarTime')) $('StompBarTime').value = String(Player.Time);
     $('StompBarLabel').textContent = `${NumberText(Player.Time, 2)} / ${NumberText(Duration, 2)} s`;
@@ -967,7 +1436,8 @@ const RiotEditor = (() => {
 
   function SetupStompBar() {
     const Player = LevelView.Stomp;
-    Player.OnChange = SyncStompBar;
+    const StompTab = () => RiotAssetTabs.Get('STOMP');
+    Player.OnChange = () => { SyncStompBar(); if (StompTab()) StompTab().Sync(); };
     Player.OnSound = Event => {
       const [Package, Index] = Event.Sound.split('_');
       const Voice = new Audio(`/api/Sound/${Package}/${parseInt(Index, 16)}`);
@@ -977,7 +1447,10 @@ const RiotEditor = (() => {
       Voice.play().catch(() => {});
       return Voice;
     };
-    Player.OnSubtitle = Line => { $('StompSubtitle').hidden = !Line; $('StompSubtitle').textContent = Line || ''; };
+    Player.OnSubtitle = Line => {
+      $('StompSubtitle').hidden = !Line; $('StompSubtitle').textContent = Line || '';
+      if (StompTab()) StompTab().Subtitle(Line);
+    };
     $('StompBarPlay').addEventListener('click', () => Player.SetPlaying(!Player.Playing));
     $('StompBarClose').addEventListener('click', () => Player.Stop());
     $('StompBarTime').addEventListener('input', () => { Player.SetPlaying(false); Player.SetTime(Number($('StompBarTime').value)); });
@@ -1082,6 +1555,19 @@ const RiotEditor = (() => {
       Change.Flags = Edit.Flags;
       Changes.set(Number, Change);
     }
+    for (const Edit of LinkEdits.values()) {
+      if (Edit.Id < 0 || Structure.Removed.has(Edit.Number)) continue;
+      const Key = Edit.Number >= 0 ? Edit.Number : 'id' + Edit.Id;
+      const Change = Changes.get(Key) || { Id: Edit.Id };
+      Change.Links = Edit.Links.slice();
+      Changes.set(Key, Change);
+    }
+    for (const Edit of ModelEdits.values()) {
+      if (Structure.Added.has(Edit.Number) || Structure.Removed.has(Edit.Number)) continue;
+      const Change = Changes.get(Edit.Number) || { Id: Edit.Id };
+      Change.Model = Edit.Model;
+      Changes.set(Edit.Number, Change);
+    }
     for (const Edit of LightEdits.values()) {
       if (!Object.keys(Edit.Properties).length || Edit.Id < 0 || Structure.Removed.has(Edit.Number)) continue;
       const Key = Edit.Number >= 0 ? Edit.Number : 'id' + Edit.Id;
@@ -1122,6 +1608,13 @@ const RiotEditor = (() => {
       Result = await Response.json();
     } catch (Error) { Result = { Error: String(Error) }; }
     if (Result.Error) { Ui.SetStatus(Text('SaveFailed', { Error: Result.Error })); $('StatusText').classList.add('Dirty'); return; }
+    if (Changes.some(Change => Change.Model) && !Added.length && !Removed.length) {
+      // PT: modelo trocado: recarrega a fase para desenhar o modelo novo / EN: model swapped: reload to draw it
+      const Id = LevelView.Selected ? Scene.Instances[LevelView.SelectedNumber()][6] : undefined;
+      await ReloadKeepingView(Id);
+      Ui.SetStatus(Text('Saved', { Count: Result.Saved, File: Result.File, Backup: Result.Backup }));
+      return;
+    }
     if (Added.length || Removed.length) {
       // PT: objetos novos/apagados: recarrega a fase (ids e células de verdade), mantendo a câmera
       // EN: structural change: reload the level (real ids and cells), keeping the camera
@@ -1129,7 +1622,7 @@ const RiotEditor = (() => {
       Camera.getWorldDirection(Forward);
       const View = [Camera.position.clone(), Camera.position.clone().add(Forward.multiplyScalar(5))];
       const NewIds = Object.values(Result.Added || {});
-      FlagEdits.clear(); LightEdits.clear(); ClearStructure();
+      FlagEdits.clear(); LightEdits.clear(); LinkEdits.clear(); ModelEdits.clear(); ClearStructure();
       await LevelView.Load(Scene.Key, { View });
       const Last = NewIds.length ? LevelView.Scene.Instances.findIndex(Instance => Instance[6] === NewIds[NewIds.length - 1]) : -1;
       if (Last >= 0) SelectNumber(Last);
@@ -1145,6 +1638,8 @@ const RiotEditor = (() => {
     }
     FlagEdits.clear();
     LightEdits.clear();
+    LinkEdits.clear();
+    ModelEdits.clear();
     const Selected = LevelView.SelectedNumber();
     Gizmo.Reset();
     if (Selected !== null) Gizmo.Attach(Selected);
@@ -1193,6 +1688,8 @@ const RiotEditor = (() => {
       for (const [Number, Edit] of [...FlagEdits]) { FlagEdits.delete(Number); ApplyShadowFlag(Number, Edit.Original); }
       for (const Edit of LightEdits.values()) if (Edit.Original) LevelView.UpdateLight(Edit.Id, Edit.Original);
       LightEdits.clear();
+      LinkEdits.clear();
+      ModelEdits.clear();
       if (Ui.LastProperties) RenderProperties(Ui.LastProperties);
       Ui.TransformChanged(Gizmo.Number, Gizmo.Number !== null ? LevelView.Scene.Instances[Gizmo.Number] : null);
     }
@@ -1218,6 +1715,7 @@ const RiotEditor = (() => {
       if (/INPUT|SELECT|TEXTAREA/.test(Event.target.tagName)) return;
       if (AssetShortcut(Event)) return;
       if (CurrentTab !== 'Level') return;   // PT: atalhos da fase só na aba Fase / EN: level shortcuts only on the Level tab
+      if (ViewShortcut(Event)) return;
       if (Event.key === 'f' || Event.key === 'F') LevelView.FocusSelection();
       if ((Event.ctrlKey || Event.metaKey) && (Event.key === 'z' || Event.key === 'Z')) { Event.preventDefault(); if (Event.shiftKey) Gizmo.Redo(); else Gizmo.Undo(); return; }
       if ((Event.ctrlKey || Event.metaKey) && (Event.key === 'y' || Event.key === 'Y')) { Event.preventDefault(); Gizmo.Redo(); return; }
@@ -1250,7 +1748,7 @@ const RiotEditor = (() => {
     $('RenderFog').addEventListener('change', ApplyFog);
     $('RenderSky').addEventListener('change', () => LevelView.SetSkyOn($('RenderSky').checked));
     $('RenderParticles').addEventListener('change', () => LevelView.Particles.SetOn($('RenderParticles').checked));
-    $('RenderParticlesOff').addEventListener('change', () => LevelView.Particles.SetShowOff($('RenderParticlesOff').checked));
+    $('RenderParticlesOff').addEventListener('change', () => { LevelView.Particles.SetShowOff($('RenderParticlesOff').checked); LevelView.RefreshFires(); });
     $('RenderAnimate').addEventListener('change', () => { LevelView.AnimateOn = $('RenderAnimate').checked; });
     $('RenderLightIcons').addEventListener('change', () => { LevelView.LightIcons.visible = $('RenderLightIcons').checked; });
     // PT: tamanho dos ícones e desempenho / EN: icon size and performance
@@ -1274,7 +1772,8 @@ const RiotEditor = (() => {
     SetupStompBar();
     setInterval(() => { if (CurrentTab === 'Level' && LevelView.Shadows.Enabled) ShowShadowStatus(); }, 700);
     $('SplatFade').addEventListener('change', () => { LevelView.Uniforms.SplatFadeOn.value = $('SplatFade').checked ? 1 : 0; });
-    for (const Element of document.querySelectorAll('input[name=RenderMode], #RenderWireframe, #RenderNormals')) Element.addEventListener('change', SyncRenderMode);
+    $('RenderNormals').addEventListener('change', SyncRenderMode);
+    SetupViewHeader();
     $('CellShow').addEventListener('change', () => LevelView.ShowCells($('CellShow').checked));
     $('CellSelect').addEventListener('change', () => LevelView.DrawCells());
     $('CellGo').addEventListener('click', () => LevelView.GoToCell($('CellSelect').value));

@@ -33,11 +33,14 @@ com o ffmpeg instalado, o servidor converte para MP4 só para a pré-visualizaç
 
 EN
 --
-Backs the Audio, STOMP and Video tabs (layouts above). Videos are WMV2: they are rebuilt as .wmv and, when ffmpeg is
+Backs the Audio, STOMP and Video tabs (layouts above). STOMP sequences can be written back (WriteSequence; every TS1 and
+TTB sequence round-trips byte-identical). Videos are WMV2: they are rebuilt as .wmv and, when ffmpeg is
 available, converted to MP4 for the browser preview.
 """
 import io
+import math
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -45,8 +48,10 @@ import tempfile
 import wave
 import zlib
 
+from .RiotMessageFlow import RiotMessageFlow
+from .RiotScreenFx import RiotScreenFx
 from .RiotPackages import RefName
-from .RiotLevel import ReadInstances
+from .RiotLevel import InstanceProperties, ReadInstances
 from .RiotProperties import MessageName
 
 LineOfDialog = 0xCC015D52
@@ -58,11 +63,27 @@ EventNames = {0: 'Transform', 1: 'Animation', 2: 'Command 2 (TTB)', 3: 'Sound', 
               7: 'Message', 8: 'Command 8 (TTB)', 9: 'Camera', 10: 'Marker'}
 
 
-def ParseSequence(Data, IsTTB):
-    """PT: Sequência 0x0311 -> {Flags, Radius, Tracks}. EN: Parses a 0x0311 sequence."""
+def FormatCodes(Format):
+    """PT: '<4f3fII' -> 'ffffffffII' (um código por valor). EN: one struct code per value."""
+    return ''.join(Code * int(Count or 1) for Count, Code in re.findall(r'(\d*)([a-zA-Z])', Format))
+
+
+def SequenceEventFormats(IsTTB):
+    """PT: Formato struct de cada tipo de evento. EN: struct format of each event type."""
     Events = dict(SequenceEvents)
     if IsTTB:
         Events[0] = '<4f3fII3f3f'
+    return Events
+
+
+def ParseSequence(Data, IsTTB):
+    """
+    PT: Sequência 0x0311 -> {Flags, Radius, Tracks, Header, HeaderFormat, Tail}. Guarda também os campos que o
+        editor não mexe (cabeçalho inteiro, bytes do nome de cada trilha, sobra no fim) para WriteSequence devolver
+        exatamente os mesmos bytes quando nada mudou.
+    EN: Parses a 0x0311 sequence, keeping everything WriteSequence needs to give the same bytes back.
+    """
+    Events = SequenceEventFormats(IsTTB)
     Position = 0
 
     def Read(Format):
@@ -71,22 +92,54 @@ def ParseSequence(Data, IsTTB):
         Position += struct.calcsize(Format)
         return Values
     if IsTTB and len(Data) >= 28 and struct.unpack_from('<II', Data, 0) == (1, 2):
-        Header = Read('<IIfIfII')
+        HeaderFormat = '<IIfIfII'
+        Header = Read(HeaderFormat)
         Flags, Radius, TrackCount = Header[3], Header[4], Header[6]
     else:
-        Flags, Radius, _Unknown, TrackCount = Read('<IfII')
+        HeaderFormat = '<IfII'
+        Header = Read(HeaderFormat)
+        Flags, Radius, _Unknown, TrackCount = Header
     Tracks = []
     for _Track in range(TrackCount):
         Length = Read('<H')[0]
-        Name = Data[Position:Position + Length].split(b'\0')[0].decode('latin1')
+        NameRaw = Data[Position:Position + Length]
+        Name = NameRaw.split(b'\0')[0].decode('latin1')
         Position += Length
         A, ObjectId, C, EventCount = Read('<4I')
         Items = []
         for _Event in range(EventCount):
             Type, Time = Read('<Hf')
-            Items.append((Type, Time, Read(Events.get(Type, '<'))))
-        Tracks.append({'Name': Name, 'A': A, 'Object': ObjectId, 'C': C, 'Events': Items})
-    return {'Flags': Flags, 'Radius': Radius, 'Tracks': Tracks}, Position
+            if Type not in Events:
+                raise struct.error('unknown event type %d' % Type)
+            Items.append((Type, Time, Read(Events[Type])))
+        Tracks.append({'Name': Name, 'NameRaw': NameRaw, 'A': A, 'Object': ObjectId, 'C': C, 'Events': Items})
+    return {'Flags': Flags, 'Radius': Radius, 'Tracks': Tracks, 'Header': list(Header), 'HeaderFormat': HeaderFormat,
+            'Tail': Data[Position:]}, Position
+
+
+def WriteSequence(Sequence, IsTTB):
+    """
+    PT: Inverso de ParseSequence. O nº de trilhas no cabeçalho e o nº de eventos de cada trilha saem das listas;
+        o resto vem como está (Flags/Radius vão para as posições deles no cabeçalho).
+    EN: Inverse of ParseSequence. Track and event counts come from the lists; Flags/Radius go to their header slots.
+    """
+    Events = SequenceEventFormats(IsTTB)
+    Header = list(Sequence['Header'])
+    if Sequence['HeaderFormat'] == '<IIfIfII':
+        Header[3], Header[4], Header[6] = Sequence['Flags'], Sequence['Radius'], len(Sequence['Tracks'])
+    else:
+        Header[0], Header[1], Header[3] = Sequence['Flags'], Sequence['Radius'], len(Sequence['Tracks'])
+    Out = [struct.pack(Sequence['HeaderFormat'], *Header)]
+    for Track in Sequence['Tracks']:
+        NameRaw = Track['NameRaw']
+        Out.append(struct.pack('<H', len(NameRaw)) + NameRaw)
+        Out.append(struct.pack('<4I', Track['A'], Track['Object'], Track['C'], len(Track['Events'])))
+        for Type, Time, Values in Track['Events']:
+            if Type not in Events:
+                raise ValueError('unknown event type %d / tipo de evento desconhecido' % Type)
+            Out.append(struct.pack('<Hf', Type, Time) + struct.pack(Events[Type], *Values))
+    Out.append(Sequence.get('Tail', b''))
+    return b''.join(Out)
 
 
 class RiotMedia:
@@ -98,6 +151,7 @@ class RiotMedia:
         self.Templates = Templates
         self._Strings = {}
         self._SequenceLevels = {}
+        self._LevelInstances = {}       # PT: caminho do .lvl -> {id: instância} / EN: .lvl path -> {id: instance}
         self._VideoCache = os.path.join(tempfile.gettempdir(), 'SurrealEdVideo')
         self.Ffmpeg = shutil.which('ffmpeg')
 
@@ -112,6 +166,51 @@ class RiotMedia:
                     Table[Chunk.Index] = Container.Data[Chunk.Offset + 2:Chunk.Offset + 2 + Length].decode('utf-16-le', 'replace').rstrip('\0')
             self._Strings[PackageId] = Table
         return self._Strings[PackageId].get(Index)
+
+    def StringPackages(self):
+        """PT: Pacotes com .xdu (textos). EN: Packages that have a .xdu (strings)."""
+        Result = []
+        for PackageId in sorted(self.Game.Packages):
+            Container = self.Game.PackageContainer(PackageId, '.xdu')
+            if Container:
+                Result.append({'Id': PackageId, 'Name': self.Game.PackageNames.get(PackageId, str(PackageId)),
+                               'Folder': os.path.dirname(os.path.relpath(self.Game.Packages[PackageId], self.Game.Root)).replace(os.sep, '/'),
+                               'Count': len(Container.ChunksOfType(0x0400))})
+        return Result
+
+    def StringList(self, PackageId):
+        """
+        PT: Todos os textos de um .xdu. Pedaço 0x0400 = u16 tamanho em bytes (com o terminador) + UTF-16LE terminado em 0
+            (conferido: os 2037 textos do TS1 e os 3638 da TTB voltam idênticos ao recodificar).
+        EN: Every string of a .xdu: chunk 0x0400 = u16 byte length (terminator included) + NUL-terminated UTF-16LE
+            (re-encoding gives back all 2037 TS1 and 3638 TTB strings byte for byte).
+        """
+        Container = self.Game.PackageContainer(PackageId, '.xdu')
+        if not Container:
+            return None
+        Result = []
+        for Chunk in Container.ChunksOfType(0x0400):
+            Data = Container.ChunkData(Chunk)
+            Length = struct.unpack_from('<H', Data, 0)[0]
+            Result.append({'Index': Chunk.Index, 'Ref': RefName(PackageId, Chunk.Index),
+                           'Text': Data[2:2 + Length].decode('utf-16-le', 'replace').rstrip('\0')})
+        return Result
+
+    @staticmethod
+    def EncodeString(Text, Original=None):
+        """
+        PT: Codifica um texto mantendo a quantidade de terminadores do original (alguns textos têm dois NUL).
+        EN: Encodes a string keeping the original's number of NUL terminators (some strings have two).
+        """
+        Nulls = 1
+        if Original:
+            Length = struct.unpack_from('<H', Original, 0)[0]
+            Old = Original[2:2 + Length].decode('utf-16-le', 'replace')
+            Nulls = max(1, len(Old) - len(Old.rstrip('\0')))
+        Encoded = (Text + '\0' * Nulls).encode('utf-16-le')
+        if len(Encoded) > 0xFFFF:
+            raise ValueError('text too long / texto longo demais')
+        return struct.pack('<H', len(Encoded)) + Encoded
 
     def StringRef(self, Ref):
         return self.String(Ref >> 16, Ref & 0xFFFF) if Ref else None
@@ -223,6 +322,46 @@ class RiotMedia:
                            'Duration': round(Duration, 3), 'Names': [Track['Name'] for Track in Sequence['Tracks']][:6]})
         return Result
 
+    def _InstancesOf(self, Level):
+        if Level['Path'] not in self._LevelInstances:
+            try:
+                Instances, _Complete = ReadInstances(self.Game.Container(Level['Path']))
+                self._LevelInstances[Level['Path']] = {Instance['Id']: Instance for Instance in Instances}
+            except (OSError, ValueError, struct.error):
+                self._LevelInstances[Level['Path']] = None
+        return self._LevelInstances[Level['Path']]
+
+    def LevelSequences(self, LevelKey):
+        """
+        PT: Sequências STOMP de uma fase: os .qdu da mesma pasta, ficando só as sequências cujos objetos são desta fase
+            (1a e 1b dividem a pasta "1 PrisonDeathRow").
+        EN: A level's STOMP sequences: the .qdu packages of the same folder, keeping the ones whose objects are here.
+        """
+        Level = next((Item for Item in self.Game.Levels() if Item['Key'] == LevelKey), None)
+        if not Level:
+            return None
+        Folder = os.path.dirname(Level['Path'])
+        Result = []
+        for PackageId, Base in sorted(self.Game.Packages.items()):
+            if os.path.dirname(Base) != Folder:
+                continue
+            Container = self.Game.PackageContainer(PackageId, '.qdu')
+            if not Container:
+                continue
+            for Chunk in Container.ChunksOfType(0x0311):
+                try:
+                    Sequence, _Used = ParseSequence(Container.ChunkData(Chunk), self.Game.IsTTB)
+                except struct.error:
+                    continue
+                Ids = [Track['Object'] for Track in Sequence['Tracks'] if Track['Object']]
+                Found, _ById = self._LevelFor(PackageId, Ids) if Ids else (None, None)
+                if Ids and (not Found or Found['Key'] != LevelKey):
+                    continue
+                Duration = max((Event[1] for Track in Sequence['Tracks'] for Event in Track['Events']), default=0)
+                Result.append({'Index': Chunk.Index, 'Ref': RefName(PackageId, Chunk.Index), 'Tracks': len(Sequence['Tracks']),
+                               'Duration': round(Duration, 3), 'Names': [Track['Name'] for Track in Sequence['Tracks']][:6]})
+        return Result
+
     def _LevelFor(self, PackageId, ObjectIds):
         """PT: Fase cujas instâncias contêm os objetos das trilhas. EN: Level whose instances hold the tracks' objects."""
         Key = (PackageId, tuple(sorted(ObjectIds)))
@@ -233,23 +372,87 @@ class RiotMedia:
         for Level in self.Game.Levels():
             if os.path.dirname(Level['Path']) != Folder:
                 continue
-            try:
-                Instances, _Complete = ReadInstances(self.Game.Container(Level['Path']))
-            except (OSError, ValueError, struct.error):
+            ById = self._InstancesOf(Level)
+            if ById is None:
                 continue
-            ById = {Instance['Id']: Instance for Instance in Instances}
             Hits = sum(1 for Id in ObjectIds if Id in ById)
             if Hits > Best[0]:
                 Best = (Hits, Level, ById)
         self._SequenceLevels[Key] = Best[1:]
         return Best[1:]
 
-    def Sequence(self, PackageId, Index):
+    def _SequenceChunk(self, PackageId, Index):
         Container = self.Game.PackageContainer(PackageId, '.qdu')
         Chunk = Container.Resource(Index).get(0x0311) if Container else None
+        return (Container, Chunk) if Chunk else (None, None)
+
+    def Sequence(self, PackageId, Index):
+        Container, Chunk = self._SequenceChunk(PackageId, Index)
         if not Chunk:
             return None
         Sequence, Used = ParseSequence(Container.ChunkData(Chunk), self.Game.IsTTB)
+        return self.DescribeSequence(PackageId, Index, Sequence, Used == Chunk.Size)
+
+    def SequenceRaw(self, PackageId, Index):
+        """
+        PT: A sequência em forma editável: os valores crus de cada evento (os mesmos que vão para o arquivo), mais o
+            que o editor precisa para converter (PositionScale, formato de cada tipo).
+        EN: The sequence in editable form: raw event values (exactly what is written) plus conversion info.
+        """
+        Container, Chunk = self._SequenceChunk(PackageId, Index)
+        if not Chunk:
+            return None
+        Sequence, _Used = ParseSequence(Container.ChunkData(Chunk), self.Game.IsTTB)
+        return {
+            'Ref': RefName(PackageId, Index), 'Flags': Sequence['Flags'], 'Radius': Sequence['Radius'],
+            'Scale': self.Game.PositionScale, 'IsTTB': self.Game.IsTTB,
+            'Formats': {str(Type): FormatCodes(Format) for Type, Format in SequenceEventFormats(self.Game.IsTTB).items()},
+            'Tracks': [{'Name': Track['Name'], 'NameHex': Track['NameRaw'].hex(), 'A': Track['A'], 'Object': Track['Object'],
+                        'C': Track['C'], 'Events': [{'Type': Type, 'Time': Time, 'Values': list(Values)} for Type, Time, Values in Track['Events']]}
+                       for Track in Sequence['Tracks']],
+        }
+
+    def SequenceFromRaw(self, PackageId, Index, Raw):
+        """
+        PT: Monta a sequência (como ParseSequence devolve) a partir da forma editável, conferindo cada valor contra o
+            formato do tipo; cabeçalho e sobra vêm do arquivo atual. Os eventos de cada trilha ficam em ordem de tempo
+            (todas as 527 sequências originais, TS1 e TTB, já estão assim). Levanta ValueError se algo não cabe.
+        EN: Builds the parsed form from the editable one, validating every value; events are kept in time order.
+        """
+        Container, Chunk = self._SequenceChunk(PackageId, Index)
+        if not Chunk:
+            raise ValueError('unknown sequence / sequência desconhecida')
+        Original, _Used = ParseSequence(Container.ChunkData(Chunk), self.Game.IsTTB)
+        Formats = SequenceEventFormats(self.Game.IsTTB)
+        Tracks = []
+        for Track in Raw['Tracks']:
+            Events = []
+            for Event in Track['Events']:
+                Type = int(Event['Type'])
+                if Type not in Formats:
+                    raise ValueError('unknown event type %d / tipo de evento desconhecido' % Type)
+                Format = FormatCodes(Formats[Type])
+                Values = list(Event['Values'])
+                if len(Values) != len(Format):
+                    raise ValueError('event type %d needs %d values / o tipo %d pede %d valores' % (Type, len(Format), Type, len(Format)))
+                Values = tuple(float(Value) if Code == 'f' else int(Value) for Code, Value in zip(Format, Values))
+                Time = float(Event['Time'])
+                if not math.isfinite(Time) or Time < 0 or any(isinstance(Value, float) and not math.isfinite(Value) for Value in Values):
+                    raise ValueError('invalid number / número inválido')
+                struct.pack('<' + Format, *Values)
+                Events.append((Type, Time, Values))
+            Events.sort(key=lambda Item: Item[1])
+            Tracks.append({'Name': Track.get('Name', ''), 'NameRaw': bytes.fromhex(Track['NameHex']), 'A': int(Track['A']),
+                           'Object': int(Track['Object']), 'C': int(Track['C']), 'Events': Events})
+        Result = dict(Original, Flags=int(Raw['Flags']), Radius=float(Raw['Radius']), Tracks=Tracks)
+        try:
+            WriteSequence(Result, self.Game.IsTTB)
+        except struct.error as Error:
+            raise ValueError(str(Error))
+        return Result
+
+    def DescribeSequence(self, PackageId, Index, Sequence, Complete=True):
+        """PT: Visão decodificada (para o tocador e a lista de chaves). EN: Decoded view (for the player and sheet)."""
         Scale = self.Game.PositionScale
         Level, ById = self._LevelFor(PackageId, [Track['Object'] for Track in Sequence['Tracks'] if Track['Object']])
         Tracks = []
@@ -297,6 +500,18 @@ class RiotMedia:
                     Event['Values'] = list(Values)
                 elif Type == 7:
                     Event['Message'] = '%d · %s' % (Values[0], MessageName(Values[0], self.Game.IsTTB) or '?')
+                    # PT: efeitos que esta mensagem liga/desliga (prévia; RiotMessageFlow) / EN: effects it switches
+                    if ById:
+                        Event['Effects'] = [[Target, Action] for Target, Action in
+                                            RiotMessageFlow(self.Templates, self.Game.IsTTB).Resolve(ById, Track['Object'], Values[0])]
+                        # PT: o que a mensagem põe na tela (títulos, flashes; TTB, RiotScreenFx) / EN: on-screen effect
+                        Target = ById.get(Track['Object'])
+                        if Target:
+                            TargetTemplate = self.Templates.Get(Target['TemplatePackage'], Target['TemplateIndex'])
+                            Screen = RiotScreenFx(self.Templates, self.Classes, self.Game.IsTTB).Resolve(
+                                TargetTemplate, InstanceProperties(TargetTemplate, Target) if TargetTemplate else {}, Values[0])
+                            if Screen:
+                                Event['Screen'] = Screen
                     Event['Values'] = list(Values)
                 elif Type in (5, 6):
                     Event['State'] = {5: {0: 'take', 1: 'release'}, 6: {0: 'hidden', 1: 'shown'}}[Type].get(Values[0], Values[0])
@@ -309,7 +524,7 @@ class RiotMedia:
         return {'Ref': RefName(PackageId, Index), 'Duration': round(Duration, 3), 'Flags': '0x%X' % Sequence['Flags'],
                 'Radius': round(Sequence['Radius'], 3),
                 'Level': Level['File'] if Level else None, 'LevelKey': Level['Key'] if Level else None, 'Tracks': Tracks,
-                'Complete': Used == Chunk.Size}
+                'Complete': Complete}
 
     # ------------------------------------------------------------------ vídeos / videos
     def VideoList(self, PackageId):

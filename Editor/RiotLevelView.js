@@ -11,6 +11,12 @@
  *     applies the game lighting formula above. Instance transform matches Suffering.exe FUN_0045A5C0.
  */
 class RiotLevelView {
+  // PT: Lighting Effect: distância da câmera (unidades) e orçamento de recálculo por quadro (ms)
+  // EN: Lighting Effect: camera range (units) and per-frame relight budget (ms)
+  static LightFxRange = 30;
+  static LightFxBudget = 4;
+  static LightFxStep = 0.1;   // PT: segundos entre passos da animação / EN: seconds between animation steps
+
   constructor(Viewport, Ui) {
     this.Viewport = Viewport;
     this.Ui = Ui;
@@ -55,7 +61,7 @@ class RiotLevelView {
     this.AnimateOn = true;
     this.Stomp = new RiotStompPlayer(this, this.Viewport);
     this.Particles = new RiotParticles(this);   // PT: efeitos (RiotParticles.js) / EN: particle effects
-    this.Viewport.OnFrame = Delta => { this.AnimateMaterials(); this.UpdateLightIcons(); this.Stomp.Frame(Delta); this.Particles.Frame(Delta); this.Shadows.Update(this.Viewport.Renderer, this.Viewport.Camera); };
+    this.Viewport.OnFrame = Delta => { this.AnimateMaterials(); this.UpdateLightIcons(); this.Stomp.Frame(Delta); this.Particles.Frame(Delta); this.UpdateFires(); this.UpdateLightEffects(); this.Shadows.Update(this.Viewport.Renderer, this.Viewport.Camera); };
   }
 
   // ------------------------------------------------------------------ materiais animados / animated materials
@@ -110,24 +116,38 @@ class RiotLevelView {
   }
 
   // ------------------------------------------------------------------ iluminação / lighting
+  /**
+   * PT: passada de splat do terreno: alfa por vértice × (1 − (profundidade / distância)²), como xvsLandsplatAlpha.vsh.
+   *     Usada também no modo "Unshaded" (sem luz), senão as camadas do terreno viram quadrados opacos.
+   * EN: terrain splat pass (per-vertex alpha with depth fade); also used by the Unshaded display mode.
+   */
+  static SplatShader(Shader, Splat) {
+    Shader.uniforms.SplatFade = { value: Splat };
+    Shader.vertexShader = Shader.vertexShader.replace('#include <common>', `#include <common>
+attribute float SplatAlpha; uniform float SplatFade; uniform float SplatFadeOn; varying float vSplat;`)
+      .replace('#include <project_vertex>', `#include <project_vertex>
+float SplatDepth = SplatFade > 0.0 && SplatFadeOn > 0.5 ? -mvPosition.z / SplatFade : 0.0;
+vSplat = SplatAlpha * clamp(1.0 - SplatDepth * SplatDepth, 0.0, 1.0);`);
+    Shader.fragmentShader = Shader.fragmentShader.replace('#include <common>', `#include <common>
+varying float vSplat;`).replace('#include <map_fragment>', `#include <map_fragment>
+diffuseColor.a = vSplat;`);
+  }
+
+  /** PT: Material sem luz de uma camada de splat. EN: Unlit material for a splat layer. */
+  UnshadedSplat(Original, Fade) {
+    const Material = new THREE.MeshBasicMaterial({ map: Original.map, side: THREE.DoubleSide, transparent: true, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: Original.polygonOffsetFactor, polygonOffsetUnits: Original.polygonOffsetUnits });
+    Material.onBeforeCompile = Shader => { Shader.uniforms.SplatFadeOn = this.Uniforms.SplatFadeOn; RiotLevelView.SplatShader(Shader, Fade); };
+    Material.customProgramCacheKey = () => 'RiotUnlitSplat';
+    return Material;
+  }
+
   Lightify(Material, Splat) {
     const Uniforms = this.Uniforms;
     const IsSplat = Splat !== undefined;
     Material.onBeforeCompile = Shader => {
       Object.assign(Shader.uniforms, Uniforms);
-      if (IsSplat) {
-        // PT: passada de splat do terreno: alfa por vértice × (1 − (profundidade / distância)²), como xvsLandsplatAlpha.vsh
-        // EN: terrain splat pass: per-vertex alpha × (1 − (depth / distance)²), as in xvsLandsplatAlpha.vsh
-        Shader.uniforms.SplatFade = { value: Splat };
-        Shader.vertexShader = Shader.vertexShader.replace('#include <common>', `#include <common>
-attribute float SplatAlpha; uniform float SplatFade; uniform float SplatFadeOn; varying float vSplat;`)
-          .replace('#include <project_vertex>', `#include <project_vertex>
-float SplatDepth = SplatFade > 0.0 && SplatFadeOn > 0.5 ? -mvPosition.z / SplatFade : 0.0;
-vSplat = SplatAlpha * clamp(1.0 - SplatDepth * SplatDepth, 0.0, 1.0);`);
-        Shader.fragmentShader = Shader.fragmentShader.replace('#include <common>', `#include <common>
-varying float vSplat;`).replace('#include <map_fragment>', `#include <map_fragment>
-diffuseColor.a = vSplat;`);
-      }
+      if (IsSplat) RiotLevelView.SplatShader(Shader, Splat);
       Shader.vertexShader = Shader.vertexShader.replace('#include <common>', `#include <common>
 attribute float vidx; attribute float LitOffset; attribute float DynOffset; attribute float ShadowSelf; varying vec3 vShadowWorld; varying vec3 vShadowNormal; varying float vShadowReceive;
 uniform sampler2D LitTexture; uniform sampler2D DynTexture; uniform float LitWidth; uniform float UseBaked; uniform float UsePoint; uniform float Ambient;
@@ -275,7 +295,10 @@ ${RiotShadows.Fragment}
    */
   LightsFromScene() {
     // PT: raio de corte do jogo (0x4C7C20): R' = √(10 × (0,33 r + 0,45 g + 0,22 b) × I) / EN: the game's cull radius
-    return this.Scene.Lights.filter(Light => Light[8] !== 0 && Light[6] > 0 && (this.ShowDormant || !Light[9])).map(Light => ({ P: new THREE.Vector3(Light[0], Light[1], Light[2]),
+    // PT: Lighting Effect ativo: cor/raio animados por cima dos valores gravados (LightAnim) / EN: animated overlay
+    const Anim = this.LightAnim || new Map();
+    return this.Scene.Lights.map(Light => { const A = Anim.get(Light[7]); return A ? [Light[0], Light[1], Light[2], A[0], A[1], A[2], A[3], Light[7], A[4] ? 1 : Light[8], Light[9]] : Light; })
+      .filter(Light => Light[8] !== 0 && Light[6] > 0 && (this.ShowDormant || !Light[9])).map(Light => ({ P: new THREE.Vector3(Light[0], Light[1], Light[2]),
       R: Light[3], G: Light[4], B: Light[5], I: Light[6], Cut: this.LightCut(Light) }));
   }
 
@@ -325,7 +348,12 @@ ${RiotShadows.Fragment}
   }
 
   /** PT: Recalcula a luz de uma instância. EN: Relights one instance. */
-  LightInstance(Number) {
+  /**
+   * PT: Recalcula a luz por vértice de uma instância; Only (opcional) = só esses vértices (terreno: só o que uma luz
+   *     animada alcança, senão o terreno inteiro custa ~230 ms na 1a).
+   * EN: Per-vertex relight of one instance; Only (optional) restricts it to those vertices.
+   */
+  LightInstance(Number, Only) {
     const Lighting = this.Lighting, Offset = Lighting.Offsets[Number];
     if (Offset < 0) return;
     const Instance = this.Scene.Instances[Number], Vertices = this.ModelVerts.get(Instance[0]);
@@ -335,8 +363,14 @@ ${RiotShadows.Fragment}
     const Data = Lighting.Data, Point = new THREE.Vector3(), Normal = new THREE.Vector3();
     // PT: sem cor pré-calculada, o motor usa ambiente + direcional (a região mais perto) / EN: unbaked: ambient + directional
     const World = Instance[5] < 0 && Instance[0] !== 'terrain' ? this.WorldLightAt(Box.getCenter(new THREE.Vector3())) : null;
-    if (!Near.length && !World) { Data.fill(0, 4 * Offset, 4 * (Offset + Vertices.Count)); return; }
-    for (let Vertex = 0; Vertex < Vertices.Count; Vertex++) {
+    if (!Near.length && !World) {
+      if (Only) for (const Vertex of Only) Data.fill(0, 4 * (Offset + Vertex), 4 * (Offset + Vertex + 1));
+      else Data.fill(0, 4 * Offset, 4 * (Offset + Vertices.Count));
+      return;
+    }
+    const Count = Only ? Only.length : Vertices.Count;
+    for (let Step = 0; Step < Count; Step++) {
+      const Vertex = Only ? Only[Step] : Step;
       Point.fromArray(Vertices.Positions, 3 * Vertex).applyMatrix4(Matrix);
       Normal.fromArray(Vertices.Normals, 3 * Vertex).applyMatrix3(Normal3).normalize();
       let Red = 0, Green = 0, Blue = 0;
@@ -380,6 +414,168 @@ ${RiotShadows.Fragment}
     });
     this.Lighting.Texture.needsUpdate = true;
     return Count;
+  }
+
+  // ------------------------------------------------------------------ Lighting Effect (luzes animadas / animated lights)
+  /**
+   * PT: Lighting Effect (classe do motor 0x6968CE68; nota 9z8 e RiotLighting.LightEffects): enquanto ativo, a cada
+   *     quadro s = (curva(fmod(t, duração)) + 1) × 0,5; cor = p6 → p7 e raio = p9 → p10 das Point Lights ligadas.
+   *     Ativo = p0 (desde o início) ou o que a prévia mandou (Forced). Os valores animados ficam em LightAnim, por cima
+   *     dos gravados em Scene.Lights (edição e gravação nunca veem a animação). Recalcula só as instâncias que a luz
+   *     alcança no maior raio possível, ~20 vezes por segundo.
+   * EN: Lighting Effect preview: animated colour/radius kept in LightAnim over the saved light values.
+   */
+  BuildLightEffects(Scene) {
+    this.LightAnim = new Map();
+    this.LightFxDirty = new Map();   // PT: a fila é da fase anterior: descarta / EN: the queue belongs to the previous level
+    this.LightFx = [];
+    this.LightFxLast = -1;
+    const Waves = Scene.Waves || {};
+    const MakeWave = Name => {
+      const Wave = Name && Waves[Name];
+      if (!Wave) return null;
+      const [Rate, Channels, Data, Duration] = Wave, Count = Math.floor(Data.length / Channels);
+      return { Rate, Channels, Data, Count, Duration: Duration || Count / Rate };
+    };
+    for (const Effect of Scene.LightEffects || []) {
+      const Ids = Effect.Lights.filter(Id => this.LightOf(Id));
+      if (!Ids.length) continue;
+      this.LightFx.push(Object.assign({}, Effect, { Ids, Forced: null, Start: 0, Applied: false, Near: null,
+        CW: MakeWave(Effect.ColorWave), RW: MakeWave(Effect.RadiusWave) }));
+    }
+  }
+
+  /** PT: Efeitos que mexem nesta instância (o próprio Lighting Effect ou uma luz dele). EN: Effects touching this instance. */
+  LightEffectsOf(InstanceId) { return (this.LightFx || []).filter(Effect => Effect.Id === InstanceId || Effect.Ids.includes(InstanceId)); }
+
+  LightEffectActive(Effect) { return Effect.Forced === null ? Boolean(Effect.On) : Effect.Forced; }
+
+  /** PT: Liga/desliga a prévia (null = volta ao estado do jogo). EN: Forces an effect on/off (null = game state). */
+  SetLightEffectForced(Effect, On) {
+    Effect.Forced = On;
+    Effect.Start = this.Viewport.Clock.elapsedTime;
+    this.LightFxLast = -1;
+  }
+
+  ClearLightEffectsForced() { for (const Effect of this.LightFx || []) Effect.Forced = null; this.LightFxLast = -1; }
+
+  /** PT: Instâncias que as luzes do efeito podem alcançar (maior raio/cor). EN: Instances the effect's lights can reach. */
+  LightEffectNear(Effect) {
+    if (Effect.Near) return Effect.Near;
+    const Box = new THREE.Box3(), Spheres = [];
+    for (const Id of Effect.Ids) {
+      const Light = this.LightOf(Id);
+      const Rgb = [0, 1, 2].map(Channel => Math.max(Light[3 + Channel], Effect.Color ? Math.max(Effect.Color[0][Channel], Effect.Color[1][Channel]) : 0));
+      const Intensity = Math.max(Light[6], Effect.Radius ? Math.max(...Effect.Radius) : 0);
+      Spheres.push([new THREE.Vector3(Light[0], Light[1], Light[2]), this.LightCut([0, 0, 0, ...Rgb, Intensity]) + 0.01]);
+    }
+    Effect.Spheres = Spheres;
+    Effect.Near = [];
+    this.Scene.Instances.forEach((_Instance, Number) => {
+      if (this.Lighting.Offsets[Number] < 0) return;
+      this.InstanceBox(Number, Box);
+      if (Spheres.some(([Center, Radius]) => Box.distanceToPoint(Center) < Radius)) Effect.Near.push(Number);
+    });
+    return Effect.Near;
+  }
+
+  /** PT: Instâncias grandes (terreno): só os vértices dentro das esferas do efeito. EN: Big instances: only vertices in reach. */
+  LightEffectVertices(Effect, Number) {
+    const Vertices = this.ModelVerts.get(this.Scene.Instances[Number][0]);
+    if (!Vertices || Vertices.Count < 3000) return null;
+    Effect.Partial = Effect.Partial || new Map();
+    if (Effect.Partial.has(Number)) return Effect.Partial.get(Number);
+    const Matrix = this.InstanceMatrix(this.Scene.Instances[Number], new THREE.Matrix4()), Point = new THREE.Vector3(), List = [];
+    for (let Vertex = 0; Vertex < Vertices.Count; Vertex++) {
+      Point.fromArray(Vertices.Positions, 3 * Vertex).applyMatrix4(Matrix);
+      if (Effect.Spheres.some(([Center, Radius]) => Point.distanceToSquared(Center) < Radius * Radius)) List.push(Vertex);
+    }
+    const Result = Int32Array.from(List);
+    Effect.Partial.set(Number, Result);
+    return Result;
+  }
+
+  /** PT: Marca uma instância para recalcular (inteira = null, ou uma lista de vértices). EN: Marks an instance dirty. */
+  MarkLightDirty(Effect, Number) {
+    const Dirty = this.LightFxDirty || (this.LightFxDirty = new Map());
+    const Part = this.LightEffectVertices(Effect, Number);
+    if (!Part) { Dirty.set(Number, null); return; }
+    if (Dirty.has(Number) && Dirty.get(Number) === null) return;
+    const Lists = Dirty.get(Number) || [];
+    if (!Lists.includes(Part)) Lists.push(Part);
+    Dirty.set(Number, Lists);
+  }
+
+  UpdateLightEffects() {
+    if (!this.LightFx || !this.LightFx.length || !this.Lighting || !this.Scene) return;
+    const Now = this.Viewport.Clock.elapsedTime;
+    if (this.LightFxLast >= 0 && Now - this.LightFxLast < RiotLevelView.LightFxStep) { this.RelightPending(); return; }
+    this.LightFxLast = Now;
+    const Camera = this.Viewport.Camera.position, Range2 = RiotLevelView.LightFxRange * RiotLevelView.LightFxRange;
+    const Dirty = this.LightFxDirty || (this.LightFxDirty = new Map());
+    for (const Effect of this.LightFx) {
+      // PT: desempenho: só anima perto da câmera (ou na prévia forçada); o recálculo da luz é por vértice, na CPU
+      // EN: performance: only animate near the camera (or when forced); relighting is per-vertex on the CPU
+      const Light = this.LightOf(Effect.Ids[0]);
+      const Near = Effect.Forced === true || (Light && (Light[0] - Camera.x) ** 2 + (Light[1] - Camera.y) ** 2 + (Light[2] - Camera.z) ** 2 < Range2);
+      const Active = this.LightEffectActive(Effect) && Near;
+      if (!Active) {
+        if (Effect.Applied) {
+          for (const Id of Effect.Ids) this.LightAnim.delete(Id);
+          Effect.Applied = false;
+          for (const Number of this.LightEffectNear(Effect)) this.MarkLightDirty(Effect, Number);
+        }
+        continue;
+      }
+      // PT: com "animar" desligado o tempo fica parado (como os materiais) / EN: frozen when animation is off
+      const Elapsed = this.AnimateOn ? Now - (Effect.Forced === null ? 0 : Effect.Start) : 0;
+      const Factor = Wave => {
+        let Time = Elapsed;
+        if (!Effect.Loop && Time >= Wave.Duration) Time = Wave.Duration - 1e-4;   // PT: p1 = 0: uma volta só / EN: one pass
+        return (RiotLevelView.WaveAt(Wave, Time, 0) + 1) * 0.5;
+      };
+      const ColorFactor = Effect.CW ? Factor(Effect.CW) : 0, RadiusFactor = Effect.RW ? Factor(Effect.RW) : 0;
+      for (const Id of Effect.Ids) {
+        const Base = this.LightOf(Id), Before = this.LightAnim.get(Id);
+        const Value = Before ? Before.slice(0, 4) : Base.slice(3, 7);
+        if (Effect.CW) for (let Channel = 0; Channel < 3; Channel++) Value[Channel] = Effect.Color[0][Channel] + (Effect.Color[1][Channel] - Effect.Color[0][Channel]) * ColorFactor;
+        if (Effect.RW) Value[3] = Math.max(0, Effect.Radius[0] + (Effect.Radius[1] - Effect.Radius[0]) * RadiusFactor);
+        // PT: na prévia a luz também liga (no jogo a mesma mensagem chega a ela; nota 9z8) / EN: preview also switches the light on
+        Value[4] = Effect.Forced === true ? 1 : 0;
+        if (Before && Before.every((Item, Index) => Math.abs(Item - Value[Index]) < 0.01)) continue;
+        this.LightAnim.set(Id, Value);
+        for (const Number of this.LightEffectNear(Effect)) this.MarkLightDirty(Effect, Number);
+      }
+      Effect.Applied = true;
+    }
+    if (Dirty.size) this.Lighting.Lights = this.LightsFromScene();
+    this.RelightPending();
+  }
+
+  /**
+   * PT: Recalcula a luz das instâncias pendentes até gastar LightFxBudget ms neste quadro (as mais perto da câmera
+   *     primeiro); o resto fica para os próximos quadros.
+   * EN: Relights pending instances within a per-frame time budget, nearest first; the rest waits.
+   */
+  RelightPending() {
+    const Dirty = this.LightFxDirty;
+    if (!Dirty || !Dirty.size || !this.Lighting) return;
+    for (const Number of [...Dirty.keys()]) if (!this.Scene.Instances[Number]) Dirty.delete(Number);   // PT: segurança / EN: safety
+    const Start = performance.now(), Camera = this.Viewport.Camera.position, Instances = this.Scene.Instances;
+    const Order = [...Dirty.keys()].sort((A, B) => {
+      const P = Instances[A][1], Q = Instances[B][1];
+      return ((P[0] - Camera.x) ** 2 + (P[1] - Camera.y) ** 2 + (P[2] - Camera.z) ** 2) - ((Q[0] - Camera.x) ** 2 + (Q[1] - Camera.y) ** 2 + (Q[2] - Camera.z) ** 2);
+    });
+    let Done = 0;
+    for (const Number of Order) {
+      const Lists = Dirty.get(Number);
+      if (Lists === null) this.LightInstance(Number);
+      else for (const Only of Lists) this.LightInstance(Number, Only);
+      Dirty.delete(Number);
+      Done++;
+      if (performance.now() - Start > RiotLevelView.LightFxBudget) break;
+    }
+    if (Done) this.Lighting.Texture.needsUpdate = true;
   }
 
   /** PT: Luz (entrada de Scene.Lights) de uma instância de Point Light. EN: Scene.Lights entry of a Point Light instance. */
@@ -460,6 +656,10 @@ ${RiotShadows.Fragment}
       this.BuildLightIcons();
       this.BuildSky();
       this.Particles.Build(Scene);
+      this.FireByNumber = new Map((Scene.Fires || []).map(Fire => [Fire.N, Object.assign({ Forced: null }, Fire)]));
+      this.BuildLightEffects(Scene);
+      this.FireCamera = null;
+      for (const Number of this.FireByNumber.keys()) this.UpdateInstance(Number);
       if (Scene.ShadowFade) [this.Shadows.FadeStart, this.Shadows.FadeEnd] = Scene.ShadowFade;
       this.Shadows.Build();
       console.log('SurrealEd timings', { Server: ServerTime | 0, Decode: (performance.now() - ClientStart) | 0, Meshes: (performance.now() - MeshStart) | 0 });
@@ -479,6 +679,9 @@ ${RiotShadows.Fragment}
   }
 
   Unload() {
+    // PT: luzes animadas são da fase que sai (os quadros continuam rodando durante o carregamento)
+    // EN: animated lights belong to the level being left (frames keep running while loading)
+    this.LightFx = []; this.LightAnim = new Map(); this.LightFxDirty = new Map();
     if (this.Stomp) this.Stomp.Stop();
     if (this.Particles) this.Particles.Clear();
     this.ClearLinks();
@@ -534,6 +737,7 @@ ${RiotShadows.Fragment}
         });
         if (Group.b === 'splat') Mesh.renderOrder = 1 + (Group.order || 0);
         Mesh.userData = { List, ClassName, Key, Group, MakePlain: () => this.Lightify(this.Grey.clone()) };
+        if (Group.b === 'splat') Mesh.userData.MakeUnshaded = () => this.UnshadedSplat(Material, Group.fade || 0);
         this.UpdateCullSphere(Mesh);
         this.Viewport.Scene.add(Mesh);
         this.Viewport.Pickables.push(Mesh);
@@ -756,7 +960,11 @@ ${RiotShadows.Fragment}
   }
 
   Select(Selection, Missed, Quiet) {
+    const Before = this.SelectedNumber();
     this.Selected = Selection;
+    // PT: Fire apagado aparece só enquanto selecionado / EN: an unlit Fire shows only while selected
+    const After = this.SelectedNumber();
+    for (const Number of [Before, After]) if (Number !== null && Number !== undefined && this.FireByNumber && this.FireByNumber.has(Number) && !this.FireOn(Number)) { this.FireCamera = null; this.UpdateInstance(Number); }
     if (this.NormalsOn && !Quiet) this.DrawNormals();
     if (!Selection) { this.ClearLinks(); this.ClearOverlay(); this.Viewport.SetHighlight(null); this.Ui.ShowSelection(null, Missed); this.Ui.ShowProperties(null); this.Ui.SelectionChanged(null); return; }
     const { Mesh, Slot, Point } = Selection;
@@ -833,7 +1041,7 @@ ${RiotShadows.Fragment}
       this.Relight([[new THREE.Vector3(Copy[0], Copy[1], Copy[2]), this.LightCut(Copy) + 0.01]]);
     }
     if (Instance[4] === 'Point Light') this.AddLightIcon(Number);
-    else if (Instance[0] === 'fxmarker') this.AddEffectIcon(Number);
+    else if (Instance[0] === 'fxmarker' || this.HasOwnIcon(Instance[4])) this.AddEffectIcon(Number);
     this.Particles.Copied(SourceNumber, Number);
     return Number;
   }
@@ -973,7 +1181,7 @@ void main() { float S = clamp(vHeight / Height, 0.0, 1.0); float T = clamp((S - 
     }
     this.Scene.Instances.forEach((Instance, Number) => {
       if (Instance[4] === 'Point Light') this.AddLightIcon(Number);
-      else if (Instance[0] === 'fxmarker') this.AddEffectIcon(Number);
+      else if (Instance[0] === 'fxmarker' || this.HasOwnIcon(Instance[4])) this.AddEffectIcon(Number);
     });
   }
 
@@ -984,10 +1192,83 @@ void main() { float S = clamp(vHeight / Height, 0.0, 1.0); float T = clamp((S - 
     for (const Icon of this.LightIcons.children) Icon.scale.set(Size, Size, 1);
   }
 
+  /**
+   * PT: Ícones próprios por classe (desenhados aqui): fontes de partículas = bolinhas coloridas; Object Generator =
+   *     bloco de notas (ele cria cópias dos templates da lista p0 de tempos em tempos); o resto = estrela laranja.
+   * EN: Per-class icons: particle fountains = coloured dots, Object Generator = notepad, others = orange star.
+   */
+  EffectIconTexture(ClassName) {
+    this.EffectTextures = this.EffectTextures || {};
+    const Kind = /^Particle (Fountain|System)/.test(ClassName || '') ? 'Particles' : ClassName === 'Object Generator' ? 'Generator'
+      : ClassName === 'Detector' ? 'Detector' : ClassName === 'Fire' ? 'Fire' : null;
+    if (!Kind) return null;
+    if (this.EffectTextures[Kind]) return this.EffectTextures[Kind];
+    const Canvas = document.createElement('canvas');
+    Canvas.width = Canvas.height = 128;
+    const Paint = Canvas.getContext('2d');
+    Paint.lineJoin = Paint.lineCap = 'round';
+    const Outline = '#151515';
+    if (Kind === 'Particles') {
+      // PT: bolinhas saindo de um ponto, contorno escuro / EN: dots bursting out, dark outline
+      const Dots = [[34, 92, 22, '#ffb03a'], [62, 70, 15, '#ff7ab8'], [86, 88, 13, '#86c9ff'], [80, 52, 18, '#a3a8ff'],
+        [50, 40, 11, '#86c9ff'], [104, 62, 10, '#ffb03a'], [100, 26, 12, '#ff7ab8'], [70, 22, 8, '#ffb03a'], [26, 60, 9, '#a3a8ff']];
+      for (const [X, Y, R, Color] of Dots) {
+        Paint.beginPath(); Paint.arc(X, Y, R, 0, Math.PI * 2);
+        Paint.fillStyle = Color; Paint.fill();
+        Paint.lineWidth = 6; Paint.strokeStyle = Outline; Paint.stroke();
+        Paint.beginPath(); Paint.arc(X - R * 0.32, Y - R * 0.32, R * 0.28, 0, Math.PI * 2);
+        Paint.fillStyle = '#ffffff90'; Paint.fill();
+      }
+    } else if (Kind === 'Fire') {
+      // PT: chama: gota laranja com miolo amarelo / EN: flame: orange drop with a yellow core
+      const Flame = (Scale, Fill) => {
+        Paint.beginPath();
+        Paint.moveTo(64, 12 + (1 - Scale) * 60);
+        Paint.bezierCurveTo(64 + 46 * Scale, 52, 64 + 44 * Scale, 116, 64, 116);
+        Paint.bezierCurveTo(64 - 44 * Scale, 116, 64 - 46 * Scale, 70, 64 - 18 * Scale, 40 + (1 - Scale) * 30);
+        Paint.bezierCurveTo(64 - 14 * Scale, 62, 64 - 2, 54, 64, 12 + (1 - Scale) * 60);
+        Paint.closePath();
+        Paint.fillStyle = Fill; Paint.fill();
+      };
+      Flame(1, '#ff7a1a');
+      Paint.lineWidth = 7; Paint.strokeStyle = Outline; Paint.stroke();
+      Flame(0.55, '#ffd23a');
+    } else if (Kind === 'Detector') {
+      // PT: no estilo da textura "Trigger" (2_0003) que o modelo do Detector usa: quadrado branco, borda vermelha
+      // EN: styled after the "Trigger" texture (2_0003) the Detector model uses
+      Paint.fillStyle = '#ffffff'; Paint.strokeStyle = Outline; Paint.lineWidth = 7;
+      Paint.beginPath(); Paint.roundRect(14, 14, 100, 100, 12); Paint.fill(); Paint.stroke();
+      Paint.strokeStyle = '#e8262b'; Paint.lineWidth = 12;
+      Paint.beginPath(); Paint.roundRect(24, 24, 80, 80, 6); Paint.stroke();
+      Paint.fillStyle = Outline;
+      Paint.font = 'bold 58px Arial, sans-serif'; Paint.textAlign = 'center'; Paint.textBaseline = 'middle';
+      Paint.fillText('T', 64, 67);
+    } else {
+      // PT: bloco de notas com espiral e linhas / EN: notepad with spiral and lines
+      Paint.fillStyle = '#fff4d6'; Paint.strokeStyle = Outline; Paint.lineWidth = 7;
+      Paint.beginPath(); Paint.roundRect(24, 22, 80, 94, 10); Paint.fill(); Paint.stroke();
+      Paint.fillStyle = '#ffb03a';
+      Paint.beginPath(); Paint.roundRect(24, 22, 80, 20, [10, 10, 0, 0]); Paint.fill(); Paint.stroke();
+      for (const X of [42, 64, 86]) { Paint.beginPath(); Paint.moveTo(X, 12); Paint.lineTo(X, 32); Paint.lineWidth = 7; Paint.stroke(); }
+      Paint.lineWidth = 6; Paint.strokeStyle = '#6b8fd6';
+      for (const [Y, W] of [[60, 52], [78, 44], [96, 34]]) { Paint.beginPath(); Paint.moveTo(38, Y); Paint.lineTo(38 + W, Y); Paint.stroke(); }
+      Paint.fillStyle = '#86c9ff'; Paint.strokeStyle = Outline; Paint.lineWidth = 6;
+      Paint.beginPath(); Paint.arc(96, 100, 15, 0, Math.PI * 2); Paint.fill(); Paint.stroke();
+      Paint.beginPath(); Paint.moveTo(96, 92); Paint.lineTo(96, 108); Paint.moveTo(88, 100); Paint.lineTo(104, 100); Paint.stroke();
+    }
+    const Texture = new THREE.CanvasTexture(Canvas);
+    Texture.encoding = THREE.sRGBEncoding;
+    return (this.EffectTextures[Kind] = Texture);
+  }
+
+  /** PT: Classes com ícone próprio mesmo quando têm modelo (ex.: Particle Fountain com o modelo 3_01dc). EN: Classes iconed even with a model. */
+  HasOwnIcon(ClassName) { return /^(Particle (Fountain|System)|Object Generator|Detector|Fire|Lighting Effect)/.test(ClassName || ''); }
+
   /** PT: Ícone clicável para efeitos sem modelo. EN: Clickable icon for model-less effects. */
   AddEffectIcon(Number) {
     const Instance = this.Scene.Instances[Number];
-    const Material = new THREE.SpriteMaterial({ map: this.EffectTexture, sizeAttenuation: false, depthTest: false, depthWrite: false, transparent: true, color: 0xffa040 });
+    const Own = this.EffectIconTexture(Instance[4]);
+    const Material = new THREE.SpriteMaterial({ map: Own || this.EffectTexture, sizeAttenuation: false, depthTest: false, depthWrite: false, transparent: true, color: Own ? 0xffffff : 0xffa040 });
     const Icon = new THREE.Sprite(Material);
     Icon.scale.set(this.IconSize, this.IconSize, 1);
     Icon.position.fromArray(Instance[1]);
@@ -1041,11 +1322,82 @@ void main() { float S = clamp(vHeight / Height, 0.0, 1.0); float T = clamp((S - 
   }
 
   /** PT: Reaplica a matriz de uma instância em todas as malhas dela. EN: Re-applies one instance matrix to all its meshes. */
+  // ------------------------------------------------------------------ Fire (TS1)
+  /**
+   * PT: Matriz com que o objeto é desenhado: a de sempre, ou para um Fire a do jogo (FUN_6DBAC6E0): virado para a
+   *     câmera (p1 = 1: só em volta do eixo vertical; 2: de frente) e na escala de aceso p6..p8 × escala da instância.
+   * EN: Draw matrix: the usual one, or for a Fire the game's (faces the camera, lit scale p6..p8 × instance scale).
+   */
+  DisplayMatrix(Number, Out) {
+    const Instance = this.Scene.Instances[Number], Fire = this.FireByNumber && this.FireByNumber.get(Number);
+    if (!Fire) return this.InstanceMatrix(Instance, Out);
+    const Position = new THREE.Vector3().fromArray(Instance[1]);
+    const Scale = new THREE.Vector3(Fire.Scale[0] * Instance[3][0], Fire.Scale[1] * Instance[3][1], Fire.Scale[2] * Instance[3][2]);
+    let Rotation = new THREE.Quaternion();
+    if (Fire.Face) {
+      const Camera = this.Viewport.Camera.position, Direction = new THREE.Vector3().subVectors(Camera, Position);
+      if (Fire.Face === 1) Direction.y = 0;
+      if (Direction.lengthSq() > 1e-8) Rotation.setFromRotationMatrix(new THREE.Matrix4().lookAt(Direction, new THREE.Vector3(), new THREE.Vector3(0, 1, 0)));
+    } else {
+      const Plain = this.InstanceMatrix(Instance, new THREE.Matrix4()), P = new THREE.Vector3(), S = new THREE.Vector3();
+      Plain.decompose(P, Rotation, S);
+    }
+    return Out.compose(Position, Rotation, Scale);
+  }
+
+  /** PT: Fire aceso agora? (p0, ou o que um STOMP mandou) EN: Is this Fire lit now? */
+  FireOn(Number) {
+    const Fire = this.FireByNumber && this.FireByNumber.get(Number);
+    return !Fire || (Fire.Forced === null ? Boolean(Fire.On) : Fire.Forced);
+  }
+
+  /**
+   * PT: Fire apagado só aparece se estiver selecionado ou com "mostrar efeitos desligados" (como as partículas).
+   * EN: An unlit Fire only shows when selected or with "show effects that start off" (like particles).
+   */
+  FireShown(Number) {
+    if (!this.FireByNumber || !this.FireByNumber.has(Number) || this.FireOn(Number)) return true;
+    return (this.Particles && this.Particles.ShowOff) || (this.Selected && this.SelectedNumber() === Number);
+  }
+
+  SetFireForced(Number, On) {
+    const Fire = this.FireByNumber && this.FireByNumber.get(Number);
+    if (!Fire) return false;
+    Fire.Forced = On;
+    this.UpdateInstance(Number);
+    return true;
+  }
+
+  RefreshFires() { this.FireCamera = null; for (const Number of (this.FireByNumber || new Map()).keys()) this.UpdateInstance(Number); }
+
+  ClearFireForced() {
+    for (const [Number, Fire] of this.FireByNumber || []) if (Fire.Forced !== null) { Fire.Forced = null; this.UpdateInstance(Number); }
+  }
+
+  /** PT: A cada quadro: fogos que encaram a câmera giram com ela. EN: Each frame: camera-facing fires turn with it. */
+  UpdateFires() {
+    if (!this.FireByNumber || !this.FireByNumber.size || !this.Scene) return;
+    const Camera = this.Viewport.Camera.position;
+    if (this.FireCamera && this.FireCamera.equals(Camera)) return;
+    this.FireCamera = Camera.clone();
+    const Matrix = new THREE.Matrix4(), Selected = this.Selected ? this.SelectedNumber() : null;
+    for (const [Number, Fire] of this.FireByNumber) {
+      if (!Fire.Face || this.IsHidden(Number) || !this.FireShown(Number)) continue;
+      this.DisplayMatrix(Number, Matrix);
+      for (const [Mesh, Slot] of this.InstanceSlots.get(Number) || []) { Mesh.setMatrixAt(Slot, Matrix); Mesh.instanceMatrix.needsUpdate = true; }
+      if (Number === Selected && this.Overlay) this.Overlay.matrix.copy(Matrix);
+    }
+  }
+
   UpdateInstance(Number) {
-    const Matrix = this.InstanceMatrix(this.Scene.Instances[Number], new THREE.Matrix4());
-    if (this.IsHidden(Number)) Matrix.makeScale(0, 0, 0);
+    const Matrix = this.DisplayMatrix(Number, new THREE.Matrix4());
+    if (this.IsHidden(Number) || !this.FireShown(Number)) Matrix.makeScale(0, 0, 0);
     const Icon = this.LightIconOf.get(Number);
-    if (Icon) { Icon.position.fromArray(this.Scene.Instances[Number][1]); Icon.visible = !this.IsHidden(Number); }
+    if (Icon) {
+      Icon.position.fromArray(this.Scene.Instances[Number][1]); Icon.visible = !this.IsHidden(Number);
+      // PT: Fire apagado (p0 = 0, acende por mensagem): ícone apagado / EN: unlit Fire: dimmed icon
+      if (this.FireByNumber && this.FireByNumber.has(Number)) Icon.material.opacity = this.FireOn(Number) ? 1 : 0.4;
+    }
     for (const [Mesh, Slot] of this.InstanceSlots.get(Number) || []) {
       Mesh.setMatrixAt(Slot, Matrix); Mesh.instanceMatrix.needsUpdate = true;
       // PT: a esfera só cresce aqui (barato); refeita inteira no fim do arrasto / EN: only grows here (cheap)
@@ -1066,7 +1418,7 @@ void main() { float S = clamp(vHeight / Height, 0.0, 1.0); float T = clamp((S - 
    *     wireframe overlay on all of them.
    */
   HighlightInstance(Number) {
-    const Matrix = this.InstanceMatrix(this.Scene.Instances[Number], new THREE.Matrix4());
+    const Matrix = this.DisplayMatrix(Number, new THREE.Matrix4());
     const Slots = this.InstanceSlots.get(Number) || [];
     const Box = new THREE.Box3();
     this.ClearOverlay();
@@ -1107,11 +1459,24 @@ void main() { float S = clamp(vHeight / Height, 0.0, 1.0); float T = clamp((S - 
     Geometry.setAttribute('color', new THREE.Float32BufferAttribute(Colors, 3));
     this.LinkLines = new THREE.LineSegments(Geometry, new THREE.LineBasicMaterial({ vertexColors: true, depthTest: false, transparent: true }));
     this.LinkLines.renderOrder = 9;
+    // PT: um ponto na outra ponta de cada link: objetos lógicos não têm modelo (na TTB muitos ficam na altura 0)
+    // EN: a dot at the far end of each link: logic objects have no model (in TTB many sit at height 0)
+    const Ends = [], EndColors = [];
+    for (let Index = 0; Index < Points.length; Index += 6) { Ends.push(Points[Index + 3], Points[Index + 4], Points[Index + 5]); EndColors.push(Colors[Index + 3], Colors[Index + 4], Colors[Index + 5]); }
+    const EndGeometry = new THREE.BufferGeometry();
+    EndGeometry.setAttribute('position', new THREE.Float32BufferAttribute(Ends, 3));
+    EndGeometry.setAttribute('color', new THREE.Float32BufferAttribute(EndColors, 3));
+    const Dots = new THREE.Points(EndGeometry, new THREE.PointsMaterial({ size: 9, sizeAttenuation: false, vertexColors: true, depthTest: false, transparent: true }));
+    Dots.renderOrder = 9;
+    this.LinkLines.add(Dots);
     this.Viewport.Scene.add(this.LinkLines);
   }
 
   ClearLinks() {
-    if (this.LinkLines) { this.Viewport.Scene.remove(this.LinkLines); this.LinkLines.geometry.dispose(); this.LinkLines.material.dispose(); this.LinkLines = null; }
+    if (this.LinkLines) {
+      for (const Child of this.LinkLines.children) { Child.geometry.dispose(); Child.material.dispose(); }
+      this.Viewport.Scene.remove(this.LinkLines); this.LinkLines.geometry.dispose(); this.LinkLines.material.dispose(); this.LinkLines = null;
+    }
   }
 
   ClearOverlay() {

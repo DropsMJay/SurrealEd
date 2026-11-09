@@ -29,6 +29,7 @@ class RiotGizmo {
     this.Controls.enabled = false;
     Viewport.Scene.add(this.Controls);
     this.Mode = 'select';
+    this.Shown = true;                  // PT: menu View → gizmo de transformação / EN: View menu → transform gizmo
     this.Space = 'world';
     this.TranslationSnap = 0;
     this.RotationSnap = 1;
@@ -91,6 +92,21 @@ class RiotGizmo {
     if (!this.Modified.has(this.Number)) this.Modified.set(this.Number, this.Before || this.Values(this.Number));
     this.LevelView.UpdateInstance(this.Number);
     this.Ui.TransformChanged(this.Number, Instance, this.ModifiedCount());
+  }
+
+  /**
+   * PT: Alinha o objeto selecionado à câmera (posição + rotação, ou só rotação), com desfazer.
+   * EN: Aligns the selected object with the camera (position + rotation, or rotation only), undoable.
+   */
+  AlignToView(Camera, WithPosition) {
+    if (this.Number === null) return false;
+    this.Before = this.Values(this.Number);
+    if (WithPosition) this.Proxy.position.copy(Camera.position);
+    this.Proxy.quaternion.copy(Camera.quaternion);
+    this.Proxy.updateMatrixWorld(true);
+    this.ApplyProxy();
+    this.Commit();
+    return true;
   }
 
   Commit() {
@@ -167,7 +183,7 @@ class RiotGizmo {
   ApplySettings() {
     const Active = this.Mode !== 'select' && this.Number !== null;
     this.Controls.enabled = Active;
-    this.Controls.visible = Active;
+    this.Controls.visible = Active && this.Shown;
     if (this.Mode !== 'select') this.Controls.setMode(this.Mode);
     this.Controls.setSpace(this.Mode === 'scale' ? 'world' : this.Space);
     this.Controls.setTranslationSnap(this.TranslationSnap || null);

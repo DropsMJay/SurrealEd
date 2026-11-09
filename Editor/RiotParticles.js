@@ -244,6 +244,30 @@ class RiotParticles {
     if (!On) for (const Emitter of this.Emitters) Emitter.Particles.length = 0;
   }
 
+  /**
+   * PT: Estado vindo de fora (mensagens do STOMP, RiotMessageFlow no servidor): 'On' liga, 'Off' para de emitir (o que
+   *     já saiu termina), 'Toggle' alterna; null volta ao comportamento normal do editor.
+   * EN: External state (STOMP messages): 'On' starts, 'Off' stops emitting, 'Toggle' flips; null = editor default.
+   */
+  SetForced(Number, Action) {
+    for (const Emitter of this.Emitters) {
+      if (Emitter.Owner.N !== Number) continue;
+      const Current = Emitter.Forced === null || Emitter.Forced === undefined ? Emitter.StartsOn : Emitter.Forced;
+      const On = Action === 'Toggle' ? !Current : Action === 'On';
+      Emitter.Forced = Action === null ? null : On;
+      if (Action === null) { Emitter.Active = Emitter.Generator ? false : Emitter.StartsOn; continue; }
+      if (On) { Emitter.Active = !Emitter.Generator; Emitter.RunFor = Emitter.Effect.Duration > 0 ? Emitter.Effect.Duration : Infinity; if (Emitter.Generator) Emitter.Generator.Next = 0; }
+      else Emitter.Active = false;
+    }
+  }
+
+  /** PT: Começa ligado? (para "alternar") EN: Starts on? (for toggling) */
+  StartsOnFor(Number) { const Emitter = this.Emitters.find(Item => Item.Owner.N === Number); return Emitter ? Emitter.StartsOn : false; }
+
+  ClearForced() {
+    for (const Emitter of this.Emitters) if (Emitter.Forced !== undefined && Emitter.Forced !== null) { Emitter.Forced = null; Emitter.Particles.length = 0; Emitter.Active = Emitter.Generator ? false : Emitter.StartsOn; }
+  }
+
   SetShowOff(Show) {
     this.ShowOff = Show;
     for (const Emitter of this.Emitters) if (!Emitter.StartsOn) Emitter.Particles.length = 0;
@@ -253,6 +277,8 @@ class RiotParticles {
   Visible(Emitter) {
     const Owner = Emitter.Owner;
     if (Owner.N >= 0 && Owner.N === this.SelectedNumber) return !this.View.Hidden.has(Owner.N);
+    if (Emitter.Forced === true || (Emitter.Forced === false && Emitter.Particles.length)) return !(Owner.N >= 0 && this.View.Hidden.has(Owner.N));
+    if (Emitter.Forced === false) return false;
     if (!Emitter.StartsOn && !this.ShowOff) return false;
     if (Owner.Dormant && !this.View.ShowDormant) return this.ShowOff;
     if (Owner.N >= 0 && this.View.Hidden.has(Owner.N)) return false;
@@ -286,7 +312,8 @@ class RiotParticles {
 
   Update(Emitter, Dt, Distance) {
     const Effect = Emitter.Effect;
-    if (Emitter.Generator) {
+    if (Emitter.Forced === false) Emitter.Active = false;
+    else if (Emitter.Generator) {
       const Generator = Emitter.Generator;
       Generator.Next -= Dt;
       if (Generator.Next <= 0) {
@@ -295,6 +322,8 @@ class RiotParticles {
         Emitter.Active = true;
         Emitter.RunFor = Effect.Duration > 0 ? Effect.Duration : Math.min(Generator.Next, 2);
       }
+    } else if (Emitter.Forced === true && Effect.Duration > 0 && Emitter.RunFor <= 0) {
+      // PT: ligado por mensagem com duração: uma rajada só, como no jogo (?) / EN: one burst when switched on
     } else if (!Emitter.Active || Emitter.RunFor <= 0) {
       // PT: rajada já acabou: repete depois de uma pausa (só no editor) / EN: burst over: repeat after a pause (editor only)
       Emitter.Rest -= Dt;
